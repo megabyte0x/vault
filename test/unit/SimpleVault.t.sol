@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.30;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {SimpleVault} from "../../src/SimpleVault.sol";
 import {SimpleStrategy} from "../../src/SimpleStrategy.sol";
@@ -10,6 +11,8 @@ import {SimpleStrategy} from "../../src/SimpleStrategy.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 
 contract SimpleVaultTest is Test {
+    using FixedPointMathLib for uint256;
+
     SimpleVault vault;
     SimpleStrategy strategy;
 
@@ -19,6 +22,7 @@ contract SimpleVaultTest is Test {
     address user;
 
     uint256 public constant USDC_TO_MINT = 100_000_000e6;
+    uint256 public constant BASIS_POINT_SCALE = 1e4;
 
     function setUp() public {
         HelperConfig config = new HelperConfig();
@@ -58,5 +62,8 @@ contract SimpleVaultTest is Test {
         vm.startPrank(user);
         IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
         vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        console2.log("Total Assets: ", vault.totalAssets());
     }
 }

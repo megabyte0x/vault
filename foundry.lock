@@ -5,6 +5,12 @@
       "rev": "7117c90c8cf6c68e5acce4f09a6b24715cea4de6"
     }
   },
+  "lib/foundry-devops": {
+    "tag": {
+      "name": "0.4.0",
+      "rev": "efff097a87e70c3d15661c9f2a2daeae0b33d5d5"
+    }
+  },
   "lib/morpho-blue": {
     "tag": {
       "name": "v1.0.0",

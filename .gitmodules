@@ -10,3 +10,6 @@
 [submodule "lib/vault-v2"]
 	path = lib/vault-v2
 	url = https://github.com/morpho-org/vault-v2
+[submodule "lib/foundry-devops"]
+	path = lib/foundry-devops
+	url = https://github.com/Cyfrin/foundry-devops

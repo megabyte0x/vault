@@ -1,3 +1,4 @@
 @solady=lib/solady/src
 @openzeppelin=lib/openzeppelin-contracts/contracts
 @morpho=lib/vault-v2/src
+@devops=lib/foundry-devops
