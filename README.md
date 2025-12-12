@@ -4,6 +4,9 @@
 
 This is a minimal implementation of a [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626)(Vault).
 
+This SimpleVault accepts an ERC20 token and issues shares with respect to it.
+
+80% of the deposited token is split equally and supplied between Aave Pool and Morpho Vault.
 
 Reference: 
 
