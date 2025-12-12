@@ -5,6 +5,12 @@
       "rev": "7117c90c8cf6c68e5acce4f09a6b24715cea4de6"
     }
   },
+  "lib/morpho-blue": {
+    "tag": {
+      "name": "v1.0.0",
+      "rev": "55d2d99304fb3fb930c688462ae2ccabb1d533ad"
+    }
+  },
   "lib/openzeppelin-contracts": {
     "tag": {
       "name": "v5.5.0",

@@ -6,14 +6,16 @@ import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
 import {Errors} from "./lib/Errors.sol";
+import {ISimpleStrategy} from "./interfaces/ISimpleStrategy.sol";
 
 contract SimpleVault is ERC4626 {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
 
-    event SimpleVault__EntryFeeUpdated();
-    event SimpleVault__ExitFeeUpdated();
-    event SimpleVault__FeeReceipientUpdated();
+    event SimpleVault__EntryFeeUpdated(uint256 newEntryFee);
+    event SimpleVault__ExitFeeUpdated(uint256 newExitFee);
+    event SimpleVault__FeeRecipientUpdated(address newFeeRecipient);
+    event SimpleVault__StrategyUpdated(address newStrategy);
 
     address internal immutable i_asset;
 
@@ -23,12 +25,60 @@ contract SimpleVault is ERC4626 {
     uint256 private s_entryFee;
     uint256 private s_exitFee;
 
-    /// @notice Fee Receipient.
-    address private s_feeReceipient;
+    /// @notice Fee Recipient.
+    address private s_feeRecipient;
+
+    ISimpleStrategy private s_strategy;
 
     constructor(address asset_) {
         i_asset = asset_;
     }
+
+    /*
+       _____      _                        _   _____                 _   _
+      | ____|_  _| |_ ___ _ __ _ __   __ _| | |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
+      |  _| \ \/ / __/ _ \ '__| '_ \ / _` | | | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+      | |___ >  <| ||  __/ |  | | | | (_| | | |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
+      |_____/_/\_\\__\___|_|  |_| |_|\__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
+    */
+
+    function setEntryFee(uint256 newEntryFee) external {
+        s_entryFee = newEntryFee;
+
+        emit SimpleVault__EntryFeeUpdated(newEntryFee);
+    }
+
+    function setExitFee(uint256 newExitFee) external {
+        s_exitFee = newExitFee;
+
+        emit SimpleVault__ExitFeeUpdated(newExitFee);
+    }
+
+    function setFeeRecipient(address newFeeRecipient) external {
+        if (newFeeRecipient == address(0)) revert Errors.ZeroAddress();
+
+        s_feeRecipient = newFeeRecipient;
+
+        emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
+    }
+
+    function setStrategy(address newStrategy) external {
+        if (newStrategy == address(0)) revert Errors.ZeroAddress();
+
+        ERC20(i_asset).approve(newStrategy, type(uint256).max);
+
+        s_strategy = ISimpleStrategy(newStrategy);
+
+        emit SimpleVault__StrategyUpdated(newStrategy);
+    }
+
+    /*
+       ____        _     _ _        _____                 _   _
+      |  _ \ _   _| |__ | (_) ___  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
+      | |_) | | | | '_ \| | |/ __| | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+      |  __/| |_| | |_) | | | (__  |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
+      |_|    \__,_|_.__/|_|_|\___| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
+    */
 
     /// @inheritdoc ERC20
     function name() public pure override returns (string memory) {
@@ -47,51 +97,43 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function previewDeposit(uint256 assets) public view override returns (uint256 shares) {
-        uint256 fee = _feeOnTotal(assets, s_entryFee);
+        uint256 fee = _feeOnTotal(assets, getEntryFee());
         return super.previewDeposit(assets.rawSub(fee));
     }
 
     /// @inheritdoc ERC4626
     function previewMint(uint256 shares) public view override returns (uint256 assets) {
         assets = super.previewMint(shares);
-        return (assets.rawAdd(_feeOnRaw(assets, s_entryFee)));
+        return (assets.rawAdd(_feeOnRaw(assets, getEntryFee())));
     }
 
     /// @inheritdoc ERC4626
     function previewWithdraw(uint256 assets) public view override returns (uint256 shares) {
-        uint256 fee = _feeOnTotal(assets, s_exitFee);
+        uint256 fee = _feeOnTotal(assets, getExitFee());
         return super.previewWithdraw(assets.rawSub(fee));
     }
 
     /// @inheritdoc ERC4626
     function previewRedeem(uint256 shares) public view override returns (uint256 assets) {
         assets = super.previewRedeem(shares);
-        return (assets.rawAdd(_feeOnRaw(assets, s_exitFee)));
+        return (assets.rawAdd(_feeOnRaw(assets, getExitFee())));
     }
 
-    function setEntryFee(uint256 newEntryFee) external {
-        s_entryFee = newEntryFee;
-        emit SimpleVault__EntryFeeUpdated();
-    }
-
-    function setExitFee(uint256 newExitFee) external {
-        s_exitFee = newExitFee;
-        emit SimpleVault__ExitFeeUpdated();
-    }
-
-    function setFeeReceipient(address newFeeReceipient) external {
-        if (newFeeReceipient == address(0)) revert Errors.ZeroAddress();
-        s_feeReceipient = newFeeReceipient;
-        emit SimpleVault__FeeReceipientUpdated();
-    }
-
-    function getEntryFee() external view returns (uint256) {
+    function getEntryFee() public view returns (uint256) {
         return s_entryFee;
     }
 
-    function getExitFee() external view returns (uint256) {
+    function getExitFee() public view returns (uint256) {
         return s_exitFee;
     }
+
+    /*
+       ___       _                        _   _____                 _   _
+      |_ _|_ __ | |_ ___ _ __ _ __   __ _| | |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
+       | || '_ \| __/ _ \ '__| '_ \ / _` | | | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
+       | || | | | ||  __/ |  | | | | (_| | | |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
+      |___|_| |_|\__\___|_|  |_| |_|\__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
+    */
 
     /// @inheritdoc ERC4626
     function _underlyingDecimals() internal view override returns (uint8) {
@@ -100,27 +142,30 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function _deposit(address by, address to, uint256 assets, uint256 shares) internal override {
-        uint256 fee = _feeOnTotal(assets, s_entryFee);
+        uint256 fee = _feeOnTotal(assets, getEntryFee());
 
         super._deposit(by, to, assets, shares);
 
-        if (fee > 0 && s_feeReceipient != address(this)) {
-            i_asset.safeTransfer(s_feeReceipient, fee);
+        if (fee > 0 && s_feeRecipient != address(this)) {
+            i_asset.safeTransfer(s_feeRecipient, fee);
         }
+
+        s_strategy.supply(assets);
     }
 
     /// @inheritdoc ERC4626
     function _withdraw(address by, address to, address owner, uint256 assets, uint256 shares) internal override {
-        uint256 fee = _feeOnRaw(assets, s_exitFee);
+        uint256 fee = _feeOnRaw(assets, getExitFee());
 
         super._withdraw(by, to, owner, assets, shares);
 
-        if (fee > 0 && s_feeReceipient != address(this)) {
-            i_asset.safeTransfer(s_feeReceipient, fee);
+        if (fee > 0 && s_feeRecipient != address(this)) {
+            i_asset.safeTransfer(s_feeRecipient, fee);
         }
+
+        s_strategy.withdraw(assets);
     }
 
-    // === Fee operations ===
     /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
     /// Used in {ERC4626-mint} and {ERC4626-withdraw} operations.
     function _feeOnRaw(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
