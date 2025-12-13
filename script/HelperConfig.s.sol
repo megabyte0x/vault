@@ -19,6 +19,7 @@ contract HelperConfig is Script {
     address internal constant ETH_AAVE_POOL = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
     address internal constant ETH_USDC_HOLDER = 0xE20d20b0cC4e44Cd23D5B0488D5250A9ac426875;
     address public constant FEE_RECIPIENT = 0xdDCc06f98A7C71Ab602b8247d540dA5BD8f5D2A2;
+    address public constant USER = 0xa60f738a60BCA515Ac529b7335EC7CB2eE3891d2;
 
     uint256 internal constant ENTRY_FEE = 5; // 0.05% in BPS
     uint256 internal constant EXIT_FEE = 10; // 0.1% in BPS

@@ -64,6 +64,8 @@ contract SimpleVaultTest is Test {
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
-        console2.log("Total Assets: ", vault.totalAssets());
+        uint256 expected_supply = depositAmount.mulDivUp(BASIS_POINT_SCALE - networkConfig.entryFee, BASIS_POINT_SCALE);
+
+        assertEq(expected_supply, vault.totalSupply());
     }
 }

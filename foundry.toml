@@ -2,6 +2,12 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+optimizer = true
+optimizer_runs = 200
+sizes = true
+fs_permissions = [
+    { access = "read", path = "./broadcast" },
+]
 
 [lint]
 exclude_lints=[
@@ -12,7 +18,7 @@ exclude_lints=[
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_KEY}", chain = 1 }
-tenderly = { key = "${TENDERLY_ACCESS_KEY}", url = "${TENDERLY_VERIFIER_URL}" }
+tenderly = { key = "${TENDERLY_ACCESS_KEY}", chain =1,  url = "${TENDERLY_VERIFIER_URL}" }
 
 
 [rpc_endpoints]

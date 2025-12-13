@@ -27,7 +27,7 @@ build:; forge build
 
 FORK_NETWORK_ARGS := --fork-url mainnet --block-number $(BLOCK_NUMBER) --etherscan-api-key etherscan_api_key
 
-TENDERLY_NETWORK_ARGS := --slow --rpc-url tenderly --broadcast --verify
+TENDERLY_NETWORK_ARGS := --slow --rpc-url tenderly  --verify  --verifier-url $(TENDERLY_VERIFIER_URL) --etherscan-api-key $(TENDERLY_ACCESS_KEY) --broadcast
 
 test :; forge test $(FORK_NETWORK_ARGS)
 
@@ -50,4 +50,16 @@ testDeposit:
 	forge test --mt test_deposit $(FORK_NETWORK_ARGS) -vvvv
 
 deploySimpleVault:
-	@forge script script/deploy/DeploySimpleVault.s.sol:DeploySimpleVault $(TENDERLY_NETWORK_ARGS) --etherscan-api-key "$${TENDERLY_ACCESS_KEY}" --verifier-url "$${TENDERLY_VERIFIER_URL}" --account dev
+	@forge script script/deploy/DeploySimpleVault.s.sol:DeploySimpleVault $(TENDERLY_NETWORK_ARGS)  --account dev
+
+deploySimpleStrategy: 
+	@forge script script/deploy/DeploySimpleStrategy.s.sol:DeploySimpleStrategy $(TENDERLY_NETWORK_ARGS) --account dev
+
+initializeVault:
+	@forge script script/interactions/SimpleVault.s.sol:SimpleVault__Initialize $(TENDERLY_NETWORK_ARGS) --account dev
+
+setup: 
+	make deploySimpleVault && make deploySimpleStrategy && make initializeVault
+
+depositInVault:
+	@forge script script/interactions/SimpleVault.s.sol:SimpleVault__Deposit $(TENDERLY_NETWORK_ARGS) --account dev
