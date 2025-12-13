@@ -59,13 +59,41 @@ contract SimpleVaultTest is Test {
     function test_deposit() public {
         uint256 depositAmount = 100_000e6;
 
+        _deposit(depositAmount);
+
+        uint256 expected_supply = depositAmount - depositAmount.mulDivUp(networkConfig.entryFee, BASIS_POINT_SCALE);
+
+        assertEq(expected_supply, vault.totalSupply());
+    }
+
+    function testFuzz_deposit(uint256 depositAmount) public {
+        depositAmount = bound(depositAmount, 100e6, 100_000_000e6);
+
         vm.startPrank(user);
         IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
-        uint256 expected_supply = depositAmount.mulDivUp(BASIS_POINT_SCALE - networkConfig.entryFee, BASIS_POINT_SCALE);
+        uint256 expected_supply = depositAmount - depositAmount.mulDivUp(networkConfig.entryFee, BASIS_POINT_SCALE);
 
         assertEq(expected_supply, vault.totalSupply());
+    }
+
+    function test_totalSupply() public {
+        uint256 depositAmount = 100_000e6;
+
+        _deposit(depositAmount);
+
+        uint256 totalAssets = vault.totalAssets();
+        uint256 expectedAssets = depositAmount - depositAmount.mulDivUp(networkConfig.entryFee, BASIS_POINT_SCALE);
+
+        assertEq(totalAssets, expectedAssets);
+    }
+
+    function _deposit(uint256 depositAmount) internal {
+        vm.startPrank(user);
+        IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
     }
 }

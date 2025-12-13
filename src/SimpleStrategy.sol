@@ -5,6 +5,7 @@ import {Address} from "@openzeppelin/utils/Address.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IVaultV2 as IMorpho} from "@morpho/interfaces/IVaultV2.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 import {ISimpleStrategy} from "./interfaces/ISimpleStrategy.sol";
 import {IPool as IAave} from "./interfaces/IAavePool.sol";
@@ -40,6 +41,14 @@ contract SimpleStrategy is ISimpleStrategy {
         assetAddress = abi.decode(data, (address));
     }
 
+    function totalAssetsInVault() external view returns (uint256 totalAssets) {
+        uint256 assetInVault = IERC20(asset()).balanceOf(i_vault);
+
+        uint256 totalBalanceInDifferentMarkets = _getTotalBalanceInMarkets();
+
+        totalAssets = assetInVault + totalBalanceInDifferentMarkets;
+    }
+
     function supply(uint256 amount) external {
         uint256 amountToDeposit = amount.mulDivUp(PERCENTAGE_TO_DEPOSIT, BASIS_POINT_SCALE);
 
@@ -60,5 +69,19 @@ contract SimpleStrategy is ISimpleStrategy {
 
     function withdraw(uint256 amount) external {
         i_aave.withdraw(asset(), amount, i_vault);
+    }
+
+    function _getTotalBalanceInMarkets() internal view returns (uint256 totalBalance) {
+        return _getBalanceInAave() + _getBalanceInMorpho();
+    }
+
+    function _getBalanceInAave() internal view returns (uint256 balance) {
+        address aToken = IAave(i_aave).getReserveAToken(asset());
+        balance = IERC20(aToken).balanceOf(i_vault);
+    }
+
+    function _getBalanceInMorpho() internal view returns (uint256 balance) {
+        uint256 shares = i_morpho.balanceOf(i_vault);
+        balance = i_morpho.convertToAssets(shares);
     }
 }

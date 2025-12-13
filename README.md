@@ -12,7 +12,7 @@ This SimpleVault accepts an ERC20 token and issues shares with respect to it.
 
 - [x] Deposit funds into Aave and Morpho on each deposit into the vaults.
 - [x] Tenderly Virtual Testnet setup.
-- [ ] Logic for calculating total assets in the vaults. 
+- [x] Logic for calculating total assets in the vaults. 
 - [ ] Logic to implement a withdraw mechanism which first use the unallocated tokens and then withdraw funds from AAVE and Morpho.
 - [ ] Unit test with multiple users.
 - [ ] Fuzz tests.

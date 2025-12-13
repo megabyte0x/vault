@@ -119,6 +119,10 @@ contract SimpleVault is ERC4626 {
         return (assets.rawAdd(_feeOnRaw(assets, getExitFee())));
     }
 
+    function totalAssets() public view override returns (uint256 assets) {
+        assets = s_strategy.totalAssetsInVault();
+    }
+
     function getEntryFee() public view returns (uint256) {
         return s_entryFee;
     }
