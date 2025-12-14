@@ -26,6 +26,7 @@ contract SimpleStrategy is ISimpleStrategy {
     address public immutable i_vault;
 
     uint16 internal constant REFERRAL_CODE = 0;
+    uint256 internal constant SPILT_PERCENTAGE = 50_00;
     uint256 internal constant PERCENTAGE_TO_DEPOSIT = 80_00;
     uint256 internal constant BASIS_POINT_SCALE = 100_00;
 
@@ -44,7 +45,7 @@ contract SimpleStrategy is ISimpleStrategy {
     function totalAssetsInVault() external view returns (uint256 totalAssets) {
         uint256 assetInVault = IERC20(asset()).balanceOf(i_vault);
 
-        uint256 totalBalanceInDifferentMarkets = _getTotalBalanceInMarkets();
+        uint256 totalBalanceInDifferentMarkets = getTotalBalanceInMarkets();
 
         totalAssets = assetInVault + totalBalanceInDifferentMarkets;
     }
@@ -56,12 +57,11 @@ contract SimpleStrategy is ISimpleStrategy {
 
         token.safeTransferFrom(i_vault, address(this), amountToDeposit);
 
-        uint256 amountToDepositInAave = amountToDeposit.mulDivUp(1, 2);
+        uint256 amountToDepositInAave = amountToDeposit.mulDiv(SPILT_PERCENTAGE, BASIS_POINT_SCALE);
+        uint256 amountToDepositInMorpho = amountToDeposit.rawSub(amountToDepositInAave);
 
         token.safeApprove(address(i_aave), amountToDepositInAave);
         i_aave.supply(asset(), amountToDepositInAave, i_vault, REFERRAL_CODE);
-
-        uint256 amountToDepositInMorpho = amountToDeposit.rawSub(amountToDepositInAave);
 
         token.safeApprove(address(i_morpho), amountToDepositInMorpho);
         i_morpho.deposit(amountToDepositInMorpho, i_vault);
@@ -71,7 +71,7 @@ contract SimpleStrategy is ISimpleStrategy {
         i_aave.withdraw(asset(), amount, i_vault);
     }
 
-    function _getTotalBalanceInMarkets() internal view returns (uint256 totalBalance) {
+    function getTotalBalanceInMarkets() public view returns (uint256 totalBalance) {
         return _getBalanceInAave() + _getBalanceInMorpho();
     }
 

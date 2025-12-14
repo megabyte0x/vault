@@ -154,7 +154,7 @@ contract SimpleVault is ERC4626 {
             i_asset.safeTransfer(s_feeRecipient, fee);
         }
 
-        s_strategy.supply(assets);
+        s_strategy.supply(assets.rawSub(fee));
     }
 
     /// @inheritdoc ERC4626

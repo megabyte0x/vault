@@ -67,7 +67,7 @@ contract SimpleVaultTest is Test {
     }
 
     function testFuzz_deposit(uint256 depositAmount) public {
-        depositAmount = bound(depositAmount, 100e6, 100_000_000e6);
+        depositAmount = bound(depositAmount, 1e6, 100_000_000e6);
 
         vm.startPrank(user);
         IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
@@ -85,7 +85,26 @@ contract SimpleVaultTest is Test {
         _deposit(depositAmount);
 
         uint256 totalAssets = vault.totalAssets();
-        uint256 expectedAssets = depositAmount - depositAmount.mulDivUp(networkConfig.entryFee, BASIS_POINT_SCALE);
+
+        uint256 assetsInVault = IERC20(networkConfig.usdc).balanceOf(address(vault));
+        uint256 assetsInMarkets = strategy.getTotalBalanceInMarkets();
+
+        uint256 expectedAssets = assetsInVault + assetsInMarkets;
+
+        assertEq(totalAssets, expectedAssets);
+    }
+
+    function testFuzz_totalSupply(uint256 depositAmount) public {
+        depositAmount = bound(depositAmount, 1e6, 100_000_000e6);
+
+        _deposit(depositAmount);
+
+        uint256 totalAssets = vault.totalAssets();
+
+        uint256 assetsInVault = IERC20(networkConfig.usdc).balanceOf(address(vault));
+        uint256 assetsInMarkets = strategy.getTotalBalanceInMarkets();
+
+        uint256 expectedAssets = assetsInVault + assetsInMarkets;
 
         assertEq(totalAssets, expectedAssets);
     }
