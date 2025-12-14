@@ -20,6 +20,8 @@ contract SimpleVault is ERC4626 {
     address internal immutable i_asset;
 
     uint256 private constant BASIS_POINT_SCALE = 1e4;
+    /// @dev As per USDC decimals (6)
+    uint256 private constant MINIMUM_ASSET_REQUIRED = 1e6;
 
     /// @dev Fee in BPS.
     uint256 private s_entryFee;
@@ -97,6 +99,7 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function previewDeposit(uint256 assets) public view override returns (uint256 shares) {
+        if (assets < MINIMUM_ASSET_REQUIRED) revert Errors.MinimumAssetRequired();
         uint256 fee = _feeOnTotal(assets, getEntryFee());
         return super.previewDeposit(assets.rawSub(fee));
     }
@@ -109,6 +112,7 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function previewWithdraw(uint256 assets) public view override returns (uint256 shares) {
+        if (assets < MINIMUM_ASSET_REQUIRED) revert Errors.MinimumAssetRequired();
         uint256 fee = _feeOnTotal(assets, getExitFee());
         return super.previewWithdraw(assets.rawSub(fee));
     }
@@ -119,6 +123,7 @@ contract SimpleVault is ERC4626 {
         return (assets.rawAdd(_feeOnRaw(assets, getExitFee())));
     }
 
+    /// @inheritdoc ERC4626
     function totalAssets() public view override returns (uint256 assets) {
         assets = s_strategy.totalAssetsInVault();
     }

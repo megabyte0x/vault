@@ -8,6 +8,7 @@ sizes = true
 fs_permissions = [
     { access = "read", path = "./broadcast" },
 ]
+dynamic_test_linking = true
 
 [lint]
 exclude_lints=[
