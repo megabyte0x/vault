@@ -58,6 +58,7 @@ contract SimpleVault is ERC4626 {
     /// @notice Initializes the vault with the specified underlying asset
     /// @param asset_ The address of the ERC20 token to be used as the underlying asset
     constructor(address asset_) {
+        if (asset_ == address(0)) revert Errors.ZeroAddress();
         i_asset = asset_;
     }
 
@@ -106,7 +107,7 @@ contract SimpleVault is ERC4626 {
         if (newStrategy == address(0)) revert Errors.ZeroAddress();
 
         // Withdraw all funds from current strategy if one exists
-        if (address(s_strategy) != address(0)) {
+        if (address(s_strategy) != address(0) && s_strategy.getTotalBalanceInMarkets() > 0) {
             s_strategy.withdrawFunds();
         }
 
@@ -206,6 +207,14 @@ contract SimpleVault is ERC4626 {
     /// @return The exit fee charged on withdrawals (in basis points)
     function getExitFee() public view returns (uint256) {
         return s_exitFee;
+    }
+
+    function getFeeRecipient() external view returns (address) {
+        return s_feeRecipient;
+    }
+
+    function getStrategy() external view returns (address) {
+        return address(s_strategy);
     }
 
     /*

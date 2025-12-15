@@ -119,8 +119,8 @@ contract SimpleStrategy is ISimpleStrategy {
 
     /// @notice Returns the total balance deployed across external protocols
     /// @dev Sums balances in Aave and Morpho
-    /// @return totalBalance The total amount deployed in external protocols
-    function getTotalBalanceInMarkets() public view returns (uint256 totalBalance) {
+    /// @return balance The total amount deployed in external protocols
+    function getTotalBalanceInMarkets() public view returns (uint256 balance) {
         return _getBalanceInAave() + _getBalanceInMorpho();
     }
 

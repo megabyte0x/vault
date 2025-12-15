@@ -19,6 +19,10 @@ This SimpleVault accepts an ERC20 token and issues shares with respect to it.
 - [ ] Invariant tests.
 
 
+## Current Coverage
+
+![Current coverage](./coverage.png)
+
 Reference: 
 
 - [RareSkills 4626 Blog](https://rareskills.io/post/erc4626)

@@ -25,7 +25,7 @@ update:; forge update
 
 build:; forge build
 
-FORK_NETWORK_ARGS := --fork-url mainnet --block-number $(BLOCK_NUMBER) --etherscan-api-key etherscan_api_key
+FORK_NETWORK_ARGS := --fork-url mainnet --fork-block-number $(BLOCK_NUMBER) --etherscan-api-key etherscan_api_key
 
 TENDERLY_NETWORK_ARGS := --slow --rpc-url tenderly  --verify  --verifier-url $(TENDERLY_VERIFIER_URL) --etherscan-api-key $(TENDERLY_ACCESS_KEY) --broadcast
 
@@ -43,8 +43,8 @@ gasReport:
 coverage:
 	forge coverage $(FORK_NETWORK_ARGS)
 
-coverageLCOV:
-	forge coverage $(FORK_NETWORK_ARGS) --report lcov
+coverageTxt:
+	forge coverage $(FORK_NETWORK_ARGS) --report debug > coverage.txt
 
 testDeposit: 
 	forge test --mt test_deposit $(FORK_NETWORK_ARGS) -vvvv

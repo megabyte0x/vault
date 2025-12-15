@@ -12,5 +12,6 @@ docs/
 
 # Dotenv file
 .env
-
+.claude
+coverage.txt
 lib

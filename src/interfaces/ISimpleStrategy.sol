@@ -25,4 +25,6 @@ interface ISimpleStrategy {
     /// @notice Returns the total assets under management across all positions
     /// @return balance The total amount of assets managed by this strategy
     function totalAssets() external view returns (uint256 balance);
+
+    function getTotalBalanceInMarkets() external view returns (uint256 balance);
 }

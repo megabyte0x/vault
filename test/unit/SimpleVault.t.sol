@@ -2,11 +2,12 @@
 pragma solidity 0.8.30;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {ERC20} from "@solady/tokens/ERC20.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {SimpleVault} from "../../src/SimpleVault.sol";
 import {SimpleStrategy} from "../../src/SimpleStrategy.sol";
+import {Errors} from "../../src/lib/Errors.sol";
 
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 
@@ -63,7 +64,18 @@ contract SimpleVaultTest is Test {
 
         // Transfer USDC from whale to test user
         vm.prank(networkConfig.usdc_holder);
-        IERC20(networkConfig.usdc).transfer(user, USDC_TO_MINT);
+        ERC20(networkConfig.usdc).transfer(user, USDC_TO_MINT);
+    }
+
+    function test_constructor() public {
+        SimpleVault newVault = new SimpleVault(networkConfig.usdc);
+
+        assertEq(newVault.asset(), networkConfig.usdc);
+    }
+
+    function test_constructor_withZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new SimpleVault(address(0));
     }
 
     /// @notice Tests that vault symbol returns correct value
@@ -79,6 +91,47 @@ contract SimpleVaultTest is Test {
     /// @notice Tests that vault asset returns correct USDC address
     function test_asset() public view {
         assertEq(vault.asset(), networkConfig.usdc);
+    }
+
+    function test_setEntryFee() public {
+        uint256 entryFeeInBPS = 100;
+        vault.setEntryFee(entryFeeInBPS);
+
+        assertEq(vault.getEntryFee(), entryFeeInBPS);
+    }
+
+    function test_setExitFee() public {
+        uint256 exitFeeInBps = 100;
+        vault.setExitFee(exitFeeInBps);
+
+        assertEq(vault.getExitFee(), exitFeeInBps);
+    }
+
+    function test_feeRecipient() public {
+        address newFeeRecipient = makeAddr("newRecipient");
+
+        vault.setFeeRecipient(newFeeRecipient);
+
+        assertEq(vault.getFeeRecipient(), newFeeRecipient);
+    }
+
+    function test_feeRecipient_withZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vault.setFeeRecipient(address(0));
+    }
+
+    function test_setStrategy() public {
+        SimpleStrategy newStrategy =
+            new SimpleStrategy(address(vault), networkConfig.aave_pool, networkConfig.morpho_vault);
+
+        vault.setStrategy(address(newStrategy));
+
+        assertEq(vault.getStrategy(), address(newStrategy));
+    }
+
+    function test_setStrategy_withZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vault.setStrategy(address(0));
     }
 
     /// @notice Tests basic deposit functionality with entry fee calculation
@@ -99,7 +152,7 @@ contract SimpleVaultTest is Test {
         depositAmount = bound(depositAmount, 1e6, 100_000_000e6);
 
         vm.startPrank(user);
-        IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
+        ERC20(networkConfig.usdc).approve(address(vault), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
@@ -113,13 +166,13 @@ contract SimpleVaultTest is Test {
     function test_withdraw() public {
         _deposit(DEPOSIT_AMOUNT);
 
-        uint256 balanceBeforeWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceBeforeWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         uint256 withdrawAmount = 90_000e6;
 
         _withdraw(withdrawAmount);
 
-        uint256 balanceAfterWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceAfterWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         uint256 changeInBalance = balanceAfterWithdraw.rawSub(balanceBeforeWithdraw);
 
@@ -145,11 +198,11 @@ contract SimpleVaultTest is Test {
 
         withdrawAmount = bound(withdrawAmount, 1, maxWithdraw);
 
-        uint256 balanceBeforeWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceBeforeWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         _withdraw(withdrawAmount);
 
-        uint256 balanceAfterWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceAfterWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         uint256 changeInBalance = balanceAfterWithdraw.rawSub(balanceBeforeWithdraw);
 
@@ -171,7 +224,7 @@ contract SimpleVaultTest is Test {
 
         _deposit(depositAmount);
 
-        uint256 unallocatedAmount = IERC20(networkConfig.usdc).balanceOf(address(vault));
+        uint256 unallocatedAmount = ERC20(networkConfig.usdc).balanceOf(address(vault));
 
         uint256 maxWithdraw = unallocatedAmount;
 
@@ -180,11 +233,11 @@ contract SimpleVaultTest is Test {
 
         withdrawAmount = bound(withdrawAmount, 1, maxWithdraw);
 
-        uint256 balanceBeforeWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceBeforeWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         _withdraw(withdrawAmount);
 
-        uint256 balanceAfterWithdraw = IERC20(networkConfig.usdc).balanceOf(user);
+        uint256 balanceAfterWithdraw = ERC20(networkConfig.usdc).balanceOf(user);
 
         uint256 changeInBalance = balanceAfterWithdraw.rawSub(balanceBeforeWithdraw);
 
@@ -201,7 +254,7 @@ contract SimpleVaultTest is Test {
 
         uint256 totalAssets = vault.totalAssets();
 
-        uint256 assetsInVault = IERC20(networkConfig.usdc).balanceOf(address(vault));
+        uint256 assetsInVault = ERC20(networkConfig.usdc).balanceOf(address(vault));
         uint256 assetsInMarkets = strategy.getTotalBalanceInMarkets();
 
         uint256 expectedAssets = assetsInVault + assetsInMarkets;
@@ -219,7 +272,7 @@ contract SimpleVaultTest is Test {
 
         uint256 totalAssets = vault.totalAssets();
 
-        uint256 assetsInVault = IERC20(networkConfig.usdc).balanceOf(address(vault));
+        uint256 assetsInVault = ERC20(networkConfig.usdc).balanceOf(address(vault));
         uint256 assetsInMarkets = strategy.getTotalBalanceInMarkets();
 
         uint256 expectedAssets = assetsInVault + assetsInMarkets;
@@ -227,12 +280,27 @@ contract SimpleVaultTest is Test {
         assertEq(totalAssets, expectedAssets);
     }
 
+    function test_deposit_calculateAPY() public {
+        _deposit(DEPOSIT_AMOUNT);
+        uint256 assetPerShareBefore = vault.convertToAssets(1e6);
+
+        vm.warp(block.timestamp + 365 days);
+        uint256 assetPerShareAfter = vault.convertToAssets(1e6);
+
+        uint256 assetPerShareIncrease = assetPerShareAfter.rawSub(assetPerShareBefore);
+        uint256 apy = assetPerShareIncrease.fullMulDiv(BASIS_POINT_SCALE, assetPerShareBefore);
+
+        console2.log("assetPerShare increase: ", assetPerShareIncrease);
+
+        console2.log("apy: ", apy);
+    }
+
     /// @notice Internal helper function to perform deposit operations
     /// @dev Handles approval and deposit in a single transaction
     /// @param depositAmount Amount of USDC to deposit
     function _deposit(uint256 depositAmount) internal {
         vm.startPrank(user);
-        IERC20(networkConfig.usdc).approve(address(vault), depositAmount);
+        ERC20(networkConfig.usdc).approve(address(vault), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
     }
