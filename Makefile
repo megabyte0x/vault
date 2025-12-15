@@ -49,6 +49,15 @@ coverageLCOV:
 testDeposit: 
 	forge test --mt test_deposit $(FORK_NETWORK_ARGS) -vvvv
 
+testTotalSupply:
+	forge test --mt test_totalSupply $(FORK_NETWORK_ARGS) -vvvv	
+
+testWithdraw:
+	forge test --mt test_withdraw $(FORK_NETWORK_ARGS) -vv
+
+testFuzz:
+	forge test --mt testFuzz $(FORK_NETWORK_ARGS) -vv	
+
 deploySimpleVault:
 	@forge script script/deploy/DeploySimpleVault.s.sol:DeploySimpleVault $(TENDERLY_NETWORK_ARGS)  --account dev
 
@@ -63,3 +72,4 @@ setup:
 
 depositInVault:
 	@forge script script/interactions/SimpleVault.s.sol:SimpleVault__Deposit $(TENDERLY_NETWORK_ARGS) --account dev
+

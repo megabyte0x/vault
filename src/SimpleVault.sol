@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {console2} from "forge-std/console2.sol";
 import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
@@ -67,7 +68,11 @@ contract SimpleVault is ERC4626 {
     function setStrategy(address newStrategy) external {
         if (newStrategy == address(0)) revert Errors.ZeroAddress();
 
-        ERC20(i_asset).approve(newStrategy, type(uint256).max);
+        if (address(s_strategy) != address(0)) {
+            s_strategy.withdrawFunds();
+        }
+
+        i_asset.safeApprove(newStrategy, type(uint256).max);
 
         s_strategy = ISimpleStrategy(newStrategy);
 
@@ -112,7 +117,6 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function previewWithdraw(uint256 assets) public view override returns (uint256 shares) {
-        if (assets < MINIMUM_ASSET_REQUIRED) revert Errors.MinimumAssetRequired();
         uint256 fee = _feeOnTotal(assets, getExitFee());
         return super.previewWithdraw(assets.rawSub(fee));
     }
@@ -125,7 +129,7 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function totalAssets() public view override returns (uint256 assets) {
-        assets = s_strategy.totalAssetsInVault();
+        assets = s_strategy.totalAssets();
     }
 
     function getEntryFee() public view returns (uint256) {
@@ -151,9 +155,9 @@ contract SimpleVault is ERC4626 {
 
     /// @inheritdoc ERC4626
     function _deposit(address by, address to, uint256 assets, uint256 shares) internal override {
-        uint256 fee = _feeOnTotal(assets, getEntryFee());
-
         super._deposit(by, to, assets, shares);
+
+        uint256 fee = _feeOnTotal(assets, getEntryFee());
 
         if (fee > 0 && s_feeRecipient != address(this)) {
             i_asset.safeTransfer(s_feeRecipient, fee);
@@ -166,13 +170,15 @@ contract SimpleVault is ERC4626 {
     function _withdraw(address by, address to, address owner, uint256 assets, uint256 shares) internal override {
         uint256 fee = _feeOnRaw(assets, getExitFee());
 
-        super._withdraw(by, to, owner, assets, shares);
-
         if (fee > 0 && s_feeRecipient != address(this)) {
             i_asset.safeTransfer(s_feeRecipient, fee);
         }
 
-        s_strategy.withdraw(assets);
+        s_strategy.withdraw(assets.rawSub(fee));
+
+        console2.log("total Balance after deallocation: ", s_strategy.totalAssets());
+
+        super._withdraw(by, to, owner, assets.rawSub(fee), shares);
     }
 
     /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.

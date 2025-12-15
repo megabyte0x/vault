@@ -8,5 +8,7 @@ interface ISimpleStrategy {
 
     function withdraw(uint256 amount) external;
 
-    function totalAssetsInVault() external view returns (uint256 balance);
+    function withdrawFunds() external;
+
+    function totalAssets() external view returns (uint256 balance);
 }
