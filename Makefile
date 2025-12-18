@@ -46,6 +46,9 @@ coverage:
 coverageTxt:
 	forge coverage $(FORK_NETWORK_ARGS) --report debug > coverage.txt
 
+coverageHTML:
+	forge coverage $(FORK_NETWORK_ARGS) --report lcov && genhtml lcov.info -o coverage-html && open coverage-html/index.html
+
 testDeposit: 
 	forge test --mt test_deposit $(FORK_NETWORK_ARGS) -vvvv
 

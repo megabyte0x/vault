@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {console2} from "forge-std/console2.sol";
 import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
@@ -38,10 +37,6 @@ contract SimpleVault is ERC4626 {
 
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 private constant BASIS_POINT_SCALE = 1e4;
-
-    /// @notice Minimum deposit amount required (1 USDC = 1e6)
-    /// @dev Set to USDC decimals (6) to prevent dust deposits
-    uint256 private constant MINIMUM_ASSET_REQUIRED = 1e6;
 
     /// @notice Entry fee charged on deposits, expressed in basis points
     uint256 private s_entryFee;
@@ -154,7 +149,6 @@ contract SimpleVault is ERC4626 {
     /// @param assets The amount of assets to be deposited
     /// @return shares The amount of shares that would be minted (after fees)
     function previewDeposit(uint256 assets) public view override returns (uint256 shares) {
-        if (assets < MINIMUM_ASSET_REQUIRED) revert Errors.MinimumAssetRequired();
         uint256 fee = _feeOnTotal(assets, getEntryFee());
         return super.previewDeposit(assets.rawSub(fee));
     }
@@ -195,6 +189,14 @@ contract SimpleVault is ERC4626 {
     /// @return assets The total amount of underlying assets managed by the vault
     function totalAssets() public view override returns (uint256 assets) {
         assets = s_strategy.totalAssets();
+    }
+
+    function maxWithdraw(address user) public view override returns (uint256 maxAssets) {
+        uint256 balanceOfUser = convertToAssets(balanceOf(user));
+
+        uint256 feeOnWithdraw = _feeOnTotal(balanceOfUser, getExitFee());
+
+        maxAssets = balanceOfUser.rawSub(feeOnWithdraw);
     }
 
     /// @notice Returns the current entry fee in basis points

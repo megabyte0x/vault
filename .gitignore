@@ -15,3 +15,5 @@ docs/
 .claude
 coverage.txt
 lib
+coverage-html
+lcov.info
