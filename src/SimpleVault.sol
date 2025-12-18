@@ -175,8 +175,8 @@ contract SimpleVault is ERC4626 {
     /// @param assets The amount of assets to be withdrawn
     /// @return shares The amount of shares that need to be burned
     function previewWithdraw(uint256 assets) public view override returns (uint256 shares) {
-        uint256 fee = _feeOnTotal(assets, getExitFee());
-        return super.previewWithdraw(assets.rawSub(fee));
+        uint256 fee = _feeOnRaw(assets, getExitFee());
+        return super.previewWithdraw(assets.rawAdd(fee));
     }
 
     /// @notice Previews the amount of assets that would be withdrawn for redeeming shares
@@ -186,7 +186,7 @@ contract SimpleVault is ERC4626 {
     /// @return assets The total amount of assets that would be withdrawn (including fees)
     function previewRedeem(uint256 shares) public view override returns (uint256 assets) {
         assets = super.previewRedeem(shares);
-        return (assets.rawAdd(_feeOnRaw(assets, getExitFee())));
+        return (assets.rawSub(_feeOnTotal(assets, getExitFee())));
     }
 
     /// @notice Returns the total amount of assets under management
@@ -270,14 +270,13 @@ contract SimpleVault is ERC4626 {
             i_asset.safeTransfer(s_feeRecipient, fee);
         }
 
-        // Withdraw assets from strategy
-        s_strategy.withdraw(assets.rawSub(fee));
+        uint256 assetsToTransfer = assets.rawSub(fee);
 
-        //! TODO: Remove debug console log before production
-        console2.log("total Balance after deallocation: ", s_strategy.totalAssets());
+        // Withdraw assets from strategy
+        s_strategy.withdraw(assetsToTransfer);
 
         // Complete the withdrawal process
-        super._withdraw(by, to, owner, assets.rawSub(fee), shares);
+        super._withdraw(by, to, owner, assetsToTransfer, shares);
     }
 
     /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
@@ -289,6 +288,6 @@ contract SimpleVault is ERC4626 {
     /// @dev Calculates the fee part of an amount `assets` that already includes fees.
     /// Used in {ERC4626-deposit} and {ERC4626-redeem} operations.
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
-        return assets.mulDivUp(feeBasisPoints, BASIS_POINT_SCALE);
+        return assets.mulDivUp(feeBasisPoints, feeBasisPoints + BASIS_POINT_SCALE);
     }
 }
