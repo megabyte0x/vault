@@ -14,4 +14,10 @@ library Errors {
 
     /// @notice Thrown when deposit amount is below the minimum required threshold
     error MinimumAssetRequired();
+
+    error ZeroAmount();
+
+    error MaxStrategiesReached();
+
+    error TotalAllocationExceeded();
 }

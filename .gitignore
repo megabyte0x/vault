@@ -17,3 +17,8 @@ coverage.txt
 lib
 coverage-html
 lcov.info
+
+# Coverage files
+crytic-export
+echidna
+medusa
