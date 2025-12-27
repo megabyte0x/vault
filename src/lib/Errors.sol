@@ -20,4 +20,10 @@ library Errors {
     error MaxStrategiesReached();
 
     error TotalAllocationExceeded();
+
+    error StrategyAlreadyAdded();
+
+    error WrongBaseAsset();
+
+    error StrategyNotFound();
 }

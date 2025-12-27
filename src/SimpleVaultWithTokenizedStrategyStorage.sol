@@ -24,11 +24,11 @@ contract SimpleVaultWithTokenizedStrategyStorage {
     /// @param newStrategy The new strategy contract address
     event SimpleVault__StrategyUpdated(address newStrategy);
 
-    event SimpleVault__TokenizedStrategyAdded(address strategy, uint16 allocation);
+    event SimpleVault__TokenizedStrategyAdded(address strategy, uint256 allocation);
 
     struct Strategy {
-        SimpleTokenizedStrategy strategy;
-        uint16 allocation; // in bps 10_00 (10% of the total assets)
+        address strategy;
+        uint256 allocation; // in bps 10_00 (10% of the total assets)
     }
 
     /// @notice The underlying asset that the vault accepts (immutable)
@@ -48,9 +48,12 @@ contract SimpleVaultWithTokenizedStrategyStorage {
     /// @notice Address that receives collected fees
     address internal s_feeRecipient;
 
-    uint16 internal s_totalStrategies;
+    uint256 internal s_totalStrategies;
 
-    mapping(uint256 => Strategy) internal s_stragies;
+    mapping(uint256 => Strategy) internal s_strategies;
+
+    /// @dev 0 means not present, otherwise index + 1.
+    mapping(address strategy => uint256 indexPlusOne) internal s_strategiesToIndex;
 
     constructor(address asset_) {
         if (asset_ == address(0)) revert Errors.ZeroAddress();

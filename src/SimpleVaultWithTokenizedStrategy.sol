@@ -58,19 +58,21 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
     }
 
-    function addStrategy(address strategy, uint16 allocation) external {
-        if (strategy == address(0)) revert Errors.ZeroAddress();
-        if (allocation == 0) revert Errors.ZeroAmount();
+    function addStrategy(address strategy, uint256 allocation) external {
+        _validateStrategyAddition(strategy, allocation);
 
-        if (s_totalStrategies + 1 >= MAX_STRATEGIES) revert Errors.MaxStrategiesReached();
-
-        _checkTotalAllocation(allocation);
-
-        s_stragies[s_totalStrategies] = Strategy({strategy: SimpleTokenizedStrategy(strategy), allocation: allocation});
+        s_strategiesToIndex[strategy] = s_totalStrategies + 1; // indexPlusOne
+        s_strategies[s_totalStrategies] = Strategy({strategy: strategy, allocation: allocation});
         s_totalStrategies += 1;
+
+        _reallocateFunds();
 
         emit SimpleVault__TokenizedStrategyAdded(strategy, allocation);
     }
+
+    function removeStrategy(uint256 strategyIndex) external {}
+
+    function replaceStrategy(uint256 strategyIndex, address newStrategy) external {}
 
     /*
        ____        _     _ _        _____                 _   _
@@ -146,11 +148,14 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @dev Delegates to the strategy contract to calculate total assets across all positions
     /// @return assets The total amount of underlying assets managed by the vault
     function totalAssets() public view override returns (uint256 assets) {
-        uint16 i = 0;
+        uint256 i = 0;
 
         for (i; i < s_totalStrategies; i++) {
-            assets.rawAdd(s_stragies[i].strategy.totalAssets());
+            assets = assets.rawAdd(_assetInStrategy(s_strategies[i].strategy));
         }
+
+        /// @dev 3. Add the idle assets (if any)
+        assets = assets.rawAdd(ERC20(i_asset).balanceOf(address(this)));
     }
 
     function maxWithdraw(address user) public view override returns (uint256 maxAssets) {
@@ -167,6 +172,12 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         return s_entryFee;
     }
 
+    function getStrategyIndex(address strategy) external view returns (uint256 index) {
+        uint256 ip1 = s_strategiesToIndex[strategy];
+        if (ip1 == 0) revert Errors.StrategyNotFound();
+        index = ip1 - 1;
+    }
+
     /// @notice Returns the current exit fee in basis points
     /// @return The exit fee charged on withdrawals (in basis points)
     function getExitFee() public view returns (uint256) {
@@ -177,6 +188,10 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         return s_feeRecipient;
     }
 
+    function getStrategyDetails(uint256 strategyIndex) external view returns (Strategy memory strategy) {
+        strategy = s_strategies[strategyIndex];
+    }
+
     /*
        ___       _                        _   _____                 _   _
       |_ _|_ __ | |_ ___ _ __ _ __   __ _| | |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
@@ -184,14 +199,6 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
        | || | | | ||  __/ |  | | | | (_| | | |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
       |___|_| |_|\__\___|_|  |_| |_|\__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
     */
-
-    /// @notice Returns the number of decimals used by the underlying asset
-    /// @inheritdoc ERC4626
-    /// @dev Used internally for precise share calculations
-    /// @return The number of decimals of the underlying asset
-    function _underlyingDecimals() internal view override returns (uint8) {
-        return ERC20(i_asset).decimals();
-    }
 
     /// @notice Internal function to handle deposits
     /// @inheritdoc ERC4626
@@ -211,16 +218,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         }
 
         // Supply remaining assets to strategy for yield generation
-        // s_strategy.deposit(assets.rawSub(fee), address(this));
-        uint256 assetToDeposit = assets.rawSub(fee);
-        uint16 i = 0;
-
-        mapping(uint256 => Strategy) storage strategies = s_stragies;
-
-        for (i; i < s_totalStrategies; i++) {
-            strategies[i].strategy
-                .deposit(assetToDeposit.mulDiv(strategies[i].allocation, BASIS_POINT_SCALE), address(this));
-        }
+        _allocateFundsInStrategies(assets.rawSub(fee));
     }
 
     /// @notice Internal function to handle withdrawals
@@ -248,6 +246,129 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         super._withdraw(by, to, owner, assetsToTransfer, shares);
     }
 
+    function _allocateFundsInStrategies(uint256 assetToDeposit) internal {
+        uint256 i = 0;
+
+        mapping(uint256 => Strategy) storage strategies = s_strategies;
+
+        for (i; i < s_totalStrategies; i++) {
+            SimpleTokenizedStrategy(strategies[i].strategy)
+                .deposit(assetToDeposit.mulDiv(strategies[i].allocation, BASIS_POINT_SCALE), address(this));
+        }
+    }
+
+    function _reallocateFunds() internal {
+        uint256 currentTotalAssets;
+
+        uint256 i = 0;
+
+        uint256 currentIdleAssetBalance = i_asset.balanceOf(address(this));
+        uint256[] memory currentAssetsBalances = new uint256[](s_totalStrategies);
+
+        uint256 totalAssetBalanceAcrossStrategies;
+
+        for (i; i < s_totalStrategies; i++) {
+            currentAssetsBalances[i] = _assetInStrategy(s_strategies[i].strategy);
+            totalAssetBalanceAcrossStrategies = totalAssetBalanceAcrossStrategies.rawAdd(currentAssetsBalances[i]);
+        }
+
+        currentTotalAssets = totalAssetBalanceAcrossStrategies.rawAdd(currentIdleAssetBalance);
+
+        uint256 targetIdleAllocation = BASIS_POINT_SCALE.rawSub(_currentTotalAllocation());
+
+        uint256 targetIdleAssetBalance = currentTotalAssets.mulDiv(targetIdleAllocation, BASIS_POINT_SCALE);
+
+        i = 0;
+        /**
+         * @dev This loop withdraw assets if they are in excess.
+         * This condition occurs when Price per share increases.
+         */
+        for (i; i < s_totalStrategies; i++) {
+            uint256 targetAssetBalance = currentTotalAssets.mulDiv(s_strategies[i].allocation, BASIS_POINT_SCALE);
+            if (currentAssetsBalances[i] > targetAssetBalance) {
+                uint256 excess = currentAssetsBalances[i].rawSub(targetAssetBalance);
+                uint256 maxWithdrawable = SimpleTokenizedStrategy(s_strategies[i].strategy).maxWithdraw(address(this));
+
+                uint256 amountToWithdraw = excess.min(maxWithdrawable);
+
+                if (amountToWithdraw == 0) continue;
+
+                SimpleTokenizedStrategy(s_strategies[i].strategy)
+                    .withdraw(amountToWithdraw, address(this), address(this));
+
+                currentIdleAssetBalance = currentIdleAssetBalance.rawAdd(amountToWithdraw);
+                currentAssetsBalances[i] = currentAssetsBalances[i].rawSub(amountToWithdraw);
+            }
+        }
+        uint256 deployable;
+
+        if (currentIdleAssetBalance >= targetIdleAssetBalance) {
+            deployable = currentIdleAssetBalance.rawSub(targetIdleAssetBalance);
+
+            i = 0;
+            for (i; i < s_totalStrategies; i++) {
+                uint256 targetAssetBalance = currentTotalAssets.mulDiv(s_strategies[i].allocation, BASIS_POINT_SCALE);
+                if (currentAssetsBalances[i] < targetAssetBalance) {
+                    uint256 need = targetAssetBalance.rawSub(currentAssetsBalances[i]);
+
+                    uint256 amountToDeposit = need.min(deployable);
+
+                    if (amountToDeposit == 0) break;
+
+                    uint256 sharesReceived =
+                        SimpleTokenizedStrategy(s_strategies[i].strategy).deposit(amountToDeposit, address(this));
+
+                    deployable = deployable.rawSub(amountToDeposit);
+                    currentAssetsBalances[i] = currentAssetsBalances[i].rawAdd(
+                        SimpleTokenizedStrategy(s_strategies[i].strategy).convertToAssets(sharesReceived)
+                    );
+                }
+            }
+        }
+    }
+
+    /// @notice Returns the number of decimals used by the underlying asset
+    /// @inheritdoc ERC4626
+    /// @dev Used internally for precise share calculations
+    /// @return The number of decimals of the underlying asset
+    function _underlyingDecimals() internal view override returns (uint8) {
+        return ERC20(i_asset).decimals();
+    }
+
+    function _currentTotalAllocation() internal view returns (uint256 currentTotalAllocation) {
+        uint256 i = 0;
+
+        for (i; i < s_totalStrategies; i++) {
+            currentTotalAllocation = currentTotalAllocation.rawAdd(s_strategies[i].allocation);
+        }
+    }
+
+    function _validateTotalAllocation(uint256 allocation) internal view {
+        if (allocation == 0) revert Errors.ZeroAmount();
+
+        if (_currentTotalAllocation() > BASIS_POINT_SCALE - allocation) {
+            revert Errors.TotalAllocationExceeded();
+        }
+    }
+
+    function _validateStrategyAddition(address strategy, uint256 allocation) internal view {
+        if (strategy == address(0)) revert Errors.ZeroAddress();
+        if (s_totalStrategies >= MAX_STRATEGIES) revert Errors.MaxStrategiesReached();
+        if (SimpleTokenizedStrategy(strategy).asset() != i_asset) revert Errors.WrongBaseAsset();
+
+        if (s_strategiesToIndex[strategy] != 0) revert Errors.StrategyAlreadyAdded();
+
+        _validateTotalAllocation(allocation);
+    }
+
+    function _assetInStrategy(address strategy) internal view returns (uint256 assets) {
+        /// @dev 1. Get the number of strategy shares.
+        uint256 strategySharesBalance = SimpleTokenizedStrategy(strategy).balanceOf(address(this));
+
+        /// @dev 2. Convert the strategy shares into base assets and add them all.
+        assets = SimpleTokenizedStrategy(strategy).convertToAssets(strategySharesBalance);
+    }
+
     /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
     /// Used in {ERC4626-mint} and {ERC4626-withdraw} operations.
     function _feeOnRaw(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
@@ -259,14 +380,28 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
         return assets.mulDivUp(feeBasisPoints, feeBasisPoints + BASIS_POINT_SCALE);
     }
-
-    function _checkTotalAllocation(uint16 allocation) internal view {
-        uint16 i = 0;
-        uint256 currentTotalAllocation;
-        for (i; i < s_totalStrategies; i++) {
-            currentTotalAllocation += s_stragies[i].allocation;
-        }
-
-        if (currentTotalAllocation + uint256(allocation) > 100) revert Errors.TotalAllocationExceeded();
-    }
 }
+
+//  /**
+//              * In both the conditions if the difference is really minimal (dust equivalent) the loop should continue.
+//              * TODO: Finalise the dust amount which can be ignored.
+//              */
+
+//             /**
+//              * @dev When the strategy is at loss and have less funds than deposited.
+//              * In this case we will need to `deposit` more funds to *this* strategy from another strategy to maintain allocation ratio.
+//              */
+//             if (targetAllocation > currentAllocation) {}
+//             /**
+//              * @dev When the strategy is in profit and have more assets than deposited.
+//              * In this case we will need to *withdraw` funds from *this* strategy.
+//              * Withdraw funds can be used to be allocated in strategy where allocation is lacking or can sit idle.
+//              */
+//             else if (targetAllocation < currentAllocation) {}
+//             /**
+//              * @dev No change in assets since deposited.
+//              * This case shouldn't occur as the shares minted while depositing in a strategy vault uses `mulDivDown`.
+//              */
+//             else {
+//                 continue;
+//             }
