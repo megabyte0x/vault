@@ -5,7 +5,11 @@ import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
-import {Errors} from "./lib/Errors.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
+import {Errors} from "./libraries/Errors.sol";
+import {Helpers} from "./libraries/Helpers.sol";
+import {StateLogic} from "./libraries/StateLogic.sol";
+import {TokenizedStrategyLogic} from "./libraries/TokenizedStrategyLogic.sol";
 import {SimpleTokenizedStrategy} from "./SimpleTokenizedStrategy.sol";
 import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenizedStrategyStorage.sol";
 
@@ -16,6 +20,9 @@ import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenize
 contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategyStorage, ERC4626 {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
+    using Helpers for DataTypes.State;
+    using StateLogic for DataTypes.State;
+    using TokenizedStrategyLogic for DataTypes.State;
 
     /// @notice Initializes the vault with the specified underlying asset
     /// @param asset_ The address of the ERC20 token to be used as the underlying asset
@@ -59,18 +66,24 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     }
 
     function addStrategy(address strategy, uint256 allocation) external {
-        _validateStrategyAddition(strategy, allocation);
+        s_state.validateStrategyAddition(strategy, allocation, i_asset);
 
-        s_strategiesToIndex[strategy] = s_totalStrategies + 1; // indexPlusOne
-        s_strategies[s_totalStrategies] = Strategy({strategy: strategy, allocation: allocation});
-        s_totalStrategies += 1;
+        s_state.addStrategy(strategy, allocation);
 
-        _reallocateFunds();
+        s_state.reallocateFunds(i_asset);
 
         emit SimpleVault__TokenizedStrategyAdded(strategy, allocation);
     }
 
-    function removeStrategy(uint256 strategyIndex) external {}
+    function removeStrategy(address strategy) external {
+        s_state.validateStrategyRemoval(strategy);
+
+        TokenizedStrategyLogic.withdrawMaxFunds(strategy);
+
+        s_state.reallocateFunds(i_asset);
+
+        emit SimpleVault__TokenizedStrategyRemoved(strategy);
+    }
 
     function replaceStrategy(uint256 strategyIndex, address newStrategy) external {}
 
@@ -150,8 +163,8 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function totalAssets() public view override returns (uint256 assets) {
         uint256 i = 0;
 
-        for (i; i < s_totalStrategies; i++) {
-            assets = assets.rawAdd(_assetInStrategy(s_strategies[i].strategy));
+        for (i; i < s_state.totalStrategies; i++) {
+            assets = assets.rawAdd(TokenizedStrategyLogic.getAssetBalanceInStrategy(s_state.strategies[i].strategy));
         }
 
         /// @dev 3. Add the idle assets (if any)
@@ -173,7 +186,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     }
 
     function getStrategyIndex(address strategy) external view returns (uint256 index) {
-        uint256 ip1 = s_strategiesToIndex[strategy];
+        uint256 ip1 = s_state.strategyToIndex[strategy];
         if (ip1 == 0) revert Errors.StrategyNotFound();
         index = ip1 - 1;
     }
@@ -188,8 +201,8 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         return s_feeRecipient;
     }
 
-    function getStrategyDetails(uint256 strategyIndex) external view returns (Strategy memory strategy) {
-        strategy = s_strategies[strategyIndex];
+    function getStrategyDetails(uint256 strategyIndex) external view returns (DataTypes.Strategy memory strategy) {
+        strategy = s_state.strategies[strategyIndex];
     }
 
     /*
@@ -249,81 +262,11 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function _allocateFundsInStrategies(uint256 assetToDeposit) internal {
         uint256 i = 0;
 
-        mapping(uint256 => Strategy) storage strategies = s_strategies;
+        mapping(uint256 => DataTypes.Strategy) storage strategies = s_state.strategies;
 
-        for (i; i < s_totalStrategies; i++) {
+        for (i; i < s_state.totalStrategies; i++) {
             SimpleTokenizedStrategy(strategies[i].strategy)
                 .deposit(assetToDeposit.mulDiv(strategies[i].allocation, BASIS_POINT_SCALE), address(this));
-        }
-    }
-
-    function _reallocateFunds() internal {
-        uint256 currentTotalAssets;
-
-        uint256 i = 0;
-
-        uint256 currentIdleAssetBalance = i_asset.balanceOf(address(this));
-        uint256[] memory currentAssetsBalances = new uint256[](s_totalStrategies);
-
-        uint256 totalAssetBalanceAcrossStrategies;
-
-        for (i; i < s_totalStrategies; i++) {
-            currentAssetsBalances[i] = _assetInStrategy(s_strategies[i].strategy);
-            totalAssetBalanceAcrossStrategies = totalAssetBalanceAcrossStrategies.rawAdd(currentAssetsBalances[i]);
-        }
-
-        currentTotalAssets = totalAssetBalanceAcrossStrategies.rawAdd(currentIdleAssetBalance);
-
-        uint256 targetIdleAllocation = BASIS_POINT_SCALE.rawSub(_currentTotalAllocation());
-
-        uint256 targetIdleAssetBalance = currentTotalAssets.mulDiv(targetIdleAllocation, BASIS_POINT_SCALE);
-
-        i = 0;
-        /**
-         * @dev This loop withdraw assets if they are in excess.
-         * This condition occurs when Price per share increases.
-         */
-        for (i; i < s_totalStrategies; i++) {
-            uint256 targetAssetBalance = currentTotalAssets.mulDiv(s_strategies[i].allocation, BASIS_POINT_SCALE);
-            if (currentAssetsBalances[i] > targetAssetBalance) {
-                uint256 excess = currentAssetsBalances[i].rawSub(targetAssetBalance);
-                uint256 maxWithdrawable = SimpleTokenizedStrategy(s_strategies[i].strategy).maxWithdraw(address(this));
-
-                uint256 amountToWithdraw = excess.min(maxWithdrawable);
-
-                if (amountToWithdraw == 0) continue;
-
-                SimpleTokenizedStrategy(s_strategies[i].strategy)
-                    .withdraw(amountToWithdraw, address(this), address(this));
-
-                currentIdleAssetBalance = currentIdleAssetBalance.rawAdd(amountToWithdraw);
-                currentAssetsBalances[i] = currentAssetsBalances[i].rawSub(amountToWithdraw);
-            }
-        }
-        uint256 deployable;
-
-        if (currentIdleAssetBalance >= targetIdleAssetBalance) {
-            deployable = currentIdleAssetBalance.rawSub(targetIdleAssetBalance);
-
-            i = 0;
-            for (i; i < s_totalStrategies; i++) {
-                uint256 targetAssetBalance = currentTotalAssets.mulDiv(s_strategies[i].allocation, BASIS_POINT_SCALE);
-                if (currentAssetsBalances[i] < targetAssetBalance) {
-                    uint256 need = targetAssetBalance.rawSub(currentAssetsBalances[i]);
-
-                    uint256 amountToDeposit = need.min(deployable);
-
-                    if (amountToDeposit == 0) break;
-
-                    uint256 sharesReceived =
-                        SimpleTokenizedStrategy(s_strategies[i].strategy).deposit(amountToDeposit, address(this));
-
-                    deployable = deployable.rawSub(amountToDeposit);
-                    currentAssetsBalances[i] = currentAssetsBalances[i].rawAdd(
-                        SimpleTokenizedStrategy(s_strategies[i].strategy).convertToAssets(sharesReceived)
-                    );
-                }
-            }
         }
     }
 
@@ -333,40 +276,6 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @return The number of decimals of the underlying asset
     function _underlyingDecimals() internal view override returns (uint8) {
         return ERC20(i_asset).decimals();
-    }
-
-    function _currentTotalAllocation() internal view returns (uint256 currentTotalAllocation) {
-        uint256 i = 0;
-
-        for (i; i < s_totalStrategies; i++) {
-            currentTotalAllocation = currentTotalAllocation.rawAdd(s_strategies[i].allocation);
-        }
-    }
-
-    function _validateTotalAllocation(uint256 allocation) internal view {
-        if (allocation == 0) revert Errors.ZeroAmount();
-
-        if (_currentTotalAllocation() > BASIS_POINT_SCALE - allocation) {
-            revert Errors.TotalAllocationExceeded();
-        }
-    }
-
-    function _validateStrategyAddition(address strategy, uint256 allocation) internal view {
-        if (strategy == address(0)) revert Errors.ZeroAddress();
-        if (s_totalStrategies >= MAX_STRATEGIES) revert Errors.MaxStrategiesReached();
-        if (SimpleTokenizedStrategy(strategy).asset() != i_asset) revert Errors.WrongBaseAsset();
-
-        if (s_strategiesToIndex[strategy] != 0) revert Errors.StrategyAlreadyAdded();
-
-        _validateTotalAllocation(allocation);
-    }
-
-    function _assetInStrategy(address strategy) internal view returns (uint256 assets) {
-        /// @dev 1. Get the number of strategy shares.
-        uint256 strategySharesBalance = SimpleTokenizedStrategy(strategy).balanceOf(address(this));
-
-        /// @dev 2. Convert the strategy shares into base assets and add them all.
-        assets = SimpleTokenizedStrategy(strategy).convertToAssets(strategySharesBalance);
     }
 
     /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
@@ -382,26 +291,3 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     }
 }
 
-//  /**
-//              * In both the conditions if the difference is really minimal (dust equivalent) the loop should continue.
-//              * TODO: Finalise the dust amount which can be ignored.
-//              */
-
-//             /**
-//              * @dev When the strategy is at loss and have less funds than deposited.
-//              * In this case we will need to `deposit` more funds to *this* strategy from another strategy to maintain allocation ratio.
-//              */
-//             if (targetAllocation > currentAllocation) {}
-//             /**
-//              * @dev When the strategy is in profit and have more assets than deposited.
-//              * In this case we will need to *withdraw` funds from *this* strategy.
-//              * Withdraw funds can be used to be allocated in strategy where allocation is lacking or can sit idle.
-//              */
-//             else if (targetAllocation < currentAllocation) {}
-//             /**
-//              * @dev No change in assets since deposited.
-//              * This case shouldn't occur as the shares minted while depositing in a strategy vault uses `mulDivDown`.
-//              */
-//             else {
-//                 continue;
-//             }

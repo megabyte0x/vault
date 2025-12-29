@@ -26,4 +26,6 @@ library Errors {
     error WrongBaseAsset();
 
     error StrategyNotFound();
+
+    error CannotWithdrawAllFundsFromStrategy();
 }
