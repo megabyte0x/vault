@@ -87,7 +87,15 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__TokenizedStrategyRemoved(strategy);
     }
 
-    function replaceStrategy(uint256 strategyIndex, address newStrategy) external {}
+    function changeStrategyAllocation(address strategy, uint256 newAllocation) external {
+        s_state.validateAllocationChange(strategy, newAllocation);
+
+        s_state.changeAllocation(strategy, newAllocation);
+
+        s_state.reallocateFunds(i_asset);
+
+        emit SimpleVault__AllocationUpdated(strategy, newAllocation);
+    }
 
     /*
        ____        _     _ _        _____                 _   _

@@ -28,4 +28,6 @@ library Errors {
     error StrategyNotFound();
 
     error CannotWithdrawAllFundsFromStrategy();
+
+    error NoChangeInAllocation();
 }

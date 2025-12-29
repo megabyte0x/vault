@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
@@ -28,12 +28,7 @@ library Helpers {
         if (strategy == address(0)) revert Errors.ZeroAddress();
         if (s.strategyToIndex[strategy] == 0) revert Errors.StrategyNotFound();
 
-        uint256 currentAssetBalance = strategy.getAssetBalanceInStrategy();
-        uint256 maxWithdrawable = strategy.getMaxWithdrawable();
-
-        if (currentAssetBalance > maxWithdrawable + 1) {
-            revert Errors.CannotWithdrawAllFundsFromStrategy();
-        }
+        _validateMaxWithdraw(strategy);
     }
 
     function validateStrategyAddition(DataTypes.State storage s, address strategy, uint256 allocation, address asset)
@@ -49,11 +44,37 @@ library Helpers {
         _validateTotalAllocation(s, allocation);
     }
 
+    function validateAllocationChange(DataTypes.State storage s, address strategy, uint256 newAllocation)
+        internal
+        view
+    {
+        if (strategy == address(0)) revert Errors.ZeroAddress();
+        uint256 index = s.strategyToIndex[strategy];
+        if (index == 0) revert Errors.StrategyNotFound();
+
+        uint256 currentAllocation = s.strategies[index - 1].allocation;
+
+        if (currentAllocation == newAllocation) revert Errors.NoChangeInAllocation();
+
+        if (currentTotalAllocation(s) - currentAllocation + newAllocation > BASIS_POINT_SCALE) {
+            revert Errors.TotalAllocationExceeded();
+        }
+    }
+
     function _validateTotalAllocation(DataTypes.State storage s, uint256 allocation) internal view {
         if (allocation == 0) revert Errors.ZeroAmount();
 
         if (currentTotalAllocation(s) > BASIS_POINT_SCALE - allocation) {
             revert Errors.TotalAllocationExceeded();
+        }
+    }
+
+    function _validateMaxWithdraw(address strategy) internal view {
+        uint256 currentAssetBalance = strategy.getAssetBalanceInStrategy();
+        uint256 maxWithdrawable = strategy.getMaxWithdrawable();
+
+        if (currentAssetBalance > maxWithdrawable + 1) {
+            revert Errors.CannotWithdrawAllFundsFromStrategy();
         }
     }
 }

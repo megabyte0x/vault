@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
 import {DataTypes} from "./lib/DataTypes.sol";
@@ -27,12 +27,15 @@ contract SimpleVaultWithTokenizedStrategyStorage {
 
     event SimpleVault__TokenizedStrategyRemoved(address strategy);
 
+    event SimpleVault__AllocationUpdated(address strategy, uint256 newAllocation);
+
     /// @notice The underlying asset that the vault accepts (immutable)
     address internal immutable i_asset;
 
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 internal constant BASIS_POINT_SCALE = 1e4;
 
+    /// @notice Max number of strategies.
     uint256 internal constant MAX_STRATEGIES = 10;
 
     /// @notice Entry fee charged on deposits, expressed in basis points
@@ -44,6 +47,7 @@ contract SimpleVaultWithTokenizedStrategyStorage {
     /// @notice Address that receives collected fees
     address internal s_feeRecipient;
 
+    /// @notice State of the strategies.
     DataTypes.State internal s_state;
 
     constructor(address asset_) {
