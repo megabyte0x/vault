@@ -80,6 +80,8 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         TokenizedStrategyLogic.withdrawMaxFunds(strategy);
 
+        s_state.removeStrategy(strategy);
+
         s_state.reallocateFunds(i_asset);
 
         emit SimpleVault__TokenizedStrategyRemoved(strategy);
