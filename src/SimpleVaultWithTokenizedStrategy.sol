@@ -5,12 +5,12 @@ import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
-import {DataTypes} from "./libraries/DataTypes.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {Helpers} from "./libraries/Helpers.sol";
-import {StateLogic} from "./libraries/StateLogic.sol";
-import {TokenizedStrategyLogic} from "./libraries/TokenizedStrategyLogic.sol";
-import {SimpleTokenizedStrategy} from "./SimpleTokenizedStrategy.sol";
+import {DataTypes} from "./lib/DataTypes.sol";
+import {Errors} from "./lib/Errors.sol";
+import {Helpers} from "./lib/Helpers.sol";
+import {StateLogic} from "./lib/StateLogic.sol";
+import {TokenizedStrategyLogic} from "./lib/TokenizedStrategyLogic.sol";
+import {SimpleTokenizedStrategy} from "./TokenizedStrategy/SimpleTokenizedStrategy.sol";
 import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenizedStrategyStorage.sol";
 
 /// @title SimpleVault

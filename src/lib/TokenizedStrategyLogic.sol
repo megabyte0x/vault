@@ -7,7 +7,7 @@ import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Helpers} from "./Helpers.sol";
 
-import {SimpleTokenizedStrategy} from "../SimpleTokenizedStrategy.sol";
+import {SimpleTokenizedStrategy} from "../TokenizedStrategy/SimpleTokenizedStrategy.sol";
 
 library TokenizedStrategyLogic {
     using FixedPointMathLib for uint256;

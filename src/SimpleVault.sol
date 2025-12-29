@@ -5,7 +5,7 @@ import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
-import {Errors} from "./libraries/Errors.sol";
+import {Errors} from "./lib/Errors.sol";
 import {ISimpleStrategy} from "./interfaces/ISimpleStrategy.sol";
 
 /// @title SimpleVault

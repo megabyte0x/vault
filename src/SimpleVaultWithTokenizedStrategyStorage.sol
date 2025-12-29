@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.30;
 
-import {DataTypes} from "./libraries/DataTypes.sol";
-import {Errors} from "./libraries/Errors.sol";
+import {DataTypes} from "./lib/DataTypes.sol";
+import {Errors} from "./lib/Errors.sol";
 
 contract SimpleVaultWithTokenizedStrategyStorage {
     /**

@@ -5,7 +5,7 @@ import {console2} from "forge-std/console2.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 import {ERC20} from "@solady/tokens/ERC20.sol";
 
-import {Errors} from "../../src/libraries/Errors.sol";
+import {Errors} from "../../src/lib/Errors.sol";
 
 import {BaseTest, SimpleVaultHarness, SimpleStrategy} from "../BaseTest.t.sol";
 

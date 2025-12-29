@@ -5,7 +5,7 @@ import {SimpleTokenizedStrategy, ERC20} from "./SimpleTokenizedStrategy.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
-import {IPool as IAave} from "./interfaces/IAavePool.sol";
+import {IPool as IAave} from "../interfaces/IAavePool.sol";
 
 contract AaveTokenizedStrategy is SimpleTokenizedStrategy {
     using FixedPointMathLib for uint256;
