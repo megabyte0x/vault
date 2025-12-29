@@ -6,16 +6,16 @@ import {DataTypes} from "./DataTypes.sol";
 /**
  * @title State Logic
  * @author @megabyte0x.eth
- * @notice This library is used to update the internal `s_state` variable of the contract.
+ * @notice This library is used to update the internal `s_strategy` variable of the contract.
  */
-library StateLogic {
+library StrategyStateLogic {
     /**
      * @notice This adds the strategy in the `strategies` mapping, increase the `totalStrategies` by 1 and adds the updated `totalStrategy` as index in `strategyToIndex` for `newStrategy`.
      * @param s Current `State`
      * @param newStrategy New strategy address
      * @param allocation New strategy allocation
      */
-    function addStrategy(DataTypes.State storage s, address newStrategy, uint256 allocation) internal {
+    function addStrategy(DataTypes.StrategyState storage s, address newStrategy, uint256 allocation) internal {
         s.strategies[s.totalStrategies] = DataTypes.Strategy({strategy: newStrategy, allocation: allocation});
         /// @dev Index + 1, this will prevent any addition to 0 index.
         s.strategyToIndex[newStrategy] = ++s.totalStrategies;
@@ -26,7 +26,7 @@ library StateLogic {
      * @param s Current `State`
      * @param strategy Strategy address to remove
      */
-    function removeStrategy(DataTypes.State storage s, address strategy) internal {
+    function removeStrategy(DataTypes.StrategyState storage s, address strategy) internal {
         uint256 idx = s.strategyToIndex[strategy] - 1;
         uint256 lastIdx = --s.totalStrategies;
 
@@ -47,7 +47,7 @@ library StateLogic {
      * @param strategy Strategy address whose allocation needs to change.
      * @param newAllocation The new allocation for the `strategy`.
      */
-    function changeAllocation(DataTypes.State storage s, address strategy, uint256 newAllocation) internal {
+    function changeAllocation(DataTypes.StrategyState storage s, address strategy, uint256 newAllocation) internal {
         s.strategies[s.strategyToIndex[strategy] - 1].allocation = newAllocation;
     }
 }

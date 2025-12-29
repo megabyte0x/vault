@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {ERC20} from "@solady/tokens/ERC20.sol";
 
 import {Errors} from "./Errors.sol";
 import {DataTypes} from "./DataTypes.sol";
@@ -16,7 +17,7 @@ library Helpers {
 
     uint256 internal constant MAX_STRATEGIES = 10;
 
-    function currentTotalAllocation(DataTypes.State storage s) internal view returns (uint256 totalAllocation) {
+    function currentTotalAllocation(DataTypes.StrategyState storage s) internal view returns (uint256 totalAllocation) {
         uint256 i = 0;
 
         for (i; i < s.totalStrategies; i++) {
@@ -24,17 +25,30 @@ library Helpers {
         }
     }
 
-    function validateStrategyRemoval(DataTypes.State storage s, address strategy) internal view {
+    function validateReallocateFunds(DataTypes.StrategyState storage s, uint256 totalAssets, address asset)
+        internal
+        view
+    {
+        uint256 currentBalance = ERC20(asset).balanceOf(address(this));
+
+        if (totalAssets.mulDiv(s.minimumIdleAssets, BASIS_POINT_SCALE) > currentBalance) {
+            revert Errors.MinimumIdleAssetNotReached();
+        }
+    }
+
+    function validateStrategyRemoval(DataTypes.StrategyState storage s, address strategy) internal view {
         if (strategy == address(0)) revert Errors.ZeroAddress();
         if (s.strategyToIndex[strategy] == 0) revert Errors.StrategyNotFound();
 
         _validateMaxWithdraw(strategy);
     }
 
-    function validateStrategyAddition(DataTypes.State storage s, address strategy, uint256 allocation, address asset)
-        internal
-        view
-    {
+    function validateStrategyAddition(
+        DataTypes.StrategyState storage s,
+        address strategy,
+        uint256 allocation,
+        address asset
+    ) internal view {
         if (strategy == address(0)) revert Errors.ZeroAddress();
         if (s.totalStrategies >= MAX_STRATEGIES) revert Errors.MaxStrategiesReached();
         if (strategy.getAsset() != asset) revert Errors.WrongBaseAsset();
@@ -44,7 +58,7 @@ library Helpers {
         _validateTotalAllocation(s, allocation);
     }
 
-    function validateAllocationChange(DataTypes.State storage s, address strategy, uint256 newAllocation)
+    function validateAllocationChange(DataTypes.StrategyState storage s, address strategy, uint256 newAllocation)
         internal
         view
     {
@@ -61,7 +75,7 @@ library Helpers {
         }
     }
 
-    function _validateTotalAllocation(DataTypes.State storage s, uint256 allocation) internal view {
+    function _validateTotalAllocation(DataTypes.StrategyState storage s, uint256 allocation) internal view {
         if (allocation == 0) revert Errors.ZeroAmount();
 
         if (currentTotalAllocation(s) > BASIS_POINT_SCALE - allocation) {

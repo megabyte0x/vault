@@ -8,9 +8,9 @@ import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {DataTypes} from "./lib/DataTypes.sol";
 import {Errors} from "./lib/Errors.sol";
 import {Helpers} from "./lib/Helpers.sol";
-import {StateLogic} from "./lib/StateLogic.sol";
+import {StrategyStateLogic} from "./lib/StrategyStateLogic.sol";
+import {VaultStateLogic} from "./lib/VaultStateLogic.sol";
 import {TokenizedStrategyLogic} from "./lib/TokenizedStrategyLogic.sol";
-import {SimpleTokenizedStrategy} from "./TokenizedStrategy/SimpleTokenizedStrategy.sol";
 import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenizedStrategyStorage.sol";
 
 /// @title SimpleVault
@@ -20,9 +20,10 @@ import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenize
 contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategyStorage, ERC4626 {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
-    using Helpers for DataTypes.State;
-    using StateLogic for DataTypes.State;
-    using TokenizedStrategyLogic for DataTypes.State;
+    using Helpers for DataTypes.StrategyState;
+    using StrategyStateLogic for DataTypes.StrategyState;
+    using TokenizedStrategyLogic for DataTypes.StrategyState;
+    using VaultStateLogic for DataTypes.VaultState;
 
     /// @notice Initializes the vault with the specified underlying asset
     /// @param asset_ The address of the ERC20 token to be used as the underlying asset
@@ -40,7 +41,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @param newEntryFee The new entry fee in basis points (e.g., 50 = 0.5%)
     //! TODO: Add access control modifiers
     function setEntryFee(uint256 newEntryFee) external {
-        s_entryFee = newEntryFee;
+        s_vault.updateEntryFee(newEntryFee);
 
         emit SimpleVault__EntryFeeUpdated(newEntryFee);
     }
@@ -49,7 +50,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @param newExitFee The new exit fee in basis points (e.g., 100 = 1%)
     //! TODO: Add access control modifiers
     function setExitFee(uint256 newExitFee) external {
-        s_exitFee = newExitFee;
+        s_vault.updateExitFee(newExitFee);
 
         emit SimpleVault__ExitFeeUpdated(newExitFee);
     }
@@ -60,41 +61,49 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function setFeeRecipient(address newFeeRecipient) external {
         if (newFeeRecipient == address(0)) revert Errors.ZeroAddress();
 
-        s_feeRecipient = newFeeRecipient;
+        s_vault.updateFeeRecipient(newFeeRecipient);
 
         emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
     }
 
     function addStrategy(address strategy, uint256 allocation) external {
-        s_state.validateStrategyAddition(strategy, allocation, i_asset);
+        s_strategy.validateStrategyAddition(strategy, allocation, i_asset);
 
-        s_state.addStrategy(strategy, allocation);
+        s_strategy.addStrategy(strategy, allocation);
 
-        s_state.reallocateFunds(i_asset);
+        s_strategy.reallocateFunds(i_asset);
 
         emit SimpleVault__TokenizedStrategyAdded(strategy, allocation);
     }
 
     function removeStrategy(address strategy) external {
-        s_state.validateStrategyRemoval(strategy);
+        s_strategy.validateStrategyRemoval(strategy);
 
         TokenizedStrategyLogic.withdrawMaxFunds(strategy);
 
-        s_state.removeStrategy(strategy);
+        s_strategy.removeStrategy(strategy);
 
-        s_state.reallocateFunds(i_asset);
+        s_strategy.reallocateFunds(i_asset);
 
         emit SimpleVault__TokenizedStrategyRemoved(strategy);
     }
 
     function changeStrategyAllocation(address strategy, uint256 newAllocation) external {
-        s_state.validateAllocationChange(strategy, newAllocation);
+        s_strategy.validateAllocationChange(strategy, newAllocation);
 
-        s_state.changeAllocation(strategy, newAllocation);
+        s_strategy.changeAllocation(strategy, newAllocation);
 
-        s_state.reallocateFunds(i_asset);
+        s_strategy.reallocateFunds(i_asset);
 
         emit SimpleVault__AllocationUpdated(strategy, newAllocation);
+    }
+
+    function reallocateFunds() external {
+        s_strategy.validateReallocateFunds(totalAssets(), i_asset);
+
+        s_strategy.reallocateFunds(i_asset);
+
+        emit SimpleVault__FundsReallocated();
     }
 
     /*
@@ -173,11 +182,10 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function totalAssets() public view override returns (uint256 assets) {
         uint256 i = 0;
 
-        for (i; i < s_state.totalStrategies; i++) {
-            assets = assets.rawAdd(TokenizedStrategyLogic.getAssetBalanceInStrategy(s_state.strategies[i].strategy));
+        for (i; i < s_strategy.totalStrategies; i++) {
+            assets = assets.rawAdd(TokenizedStrategyLogic.getAssetBalanceInStrategy(s_strategy.strategies[i].strategy));
         }
 
-        /// @dev 3. Add the idle assets (if any)
         assets = assets.rawAdd(ERC20(i_asset).balanceOf(address(this)));
     }
 
@@ -192,11 +200,11 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @notice Returns the current entry fee in basis points
     /// @return The entry fee charged on deposits (in basis points)
     function getEntryFee() public view returns (uint256) {
-        return s_entryFee;
+        return s_vault.entryFee;
     }
 
     function getStrategyIndex(address strategy) external view returns (uint256 index) {
-        uint256 ip1 = s_state.strategyToIndex[strategy];
+        uint256 ip1 = s_strategy.strategyToIndex[strategy];
         if (ip1 == 0) revert Errors.StrategyNotFound();
         index = ip1 - 1;
     }
@@ -204,15 +212,15 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     /// @notice Returns the current exit fee in basis points
     /// @return The exit fee charged on withdrawals (in basis points)
     function getExitFee() public view returns (uint256) {
-        return s_exitFee;
+        return s_vault.exitFee;
     }
 
     function getFeeRecipient() external view returns (address) {
-        return s_feeRecipient;
+        return s_vault.feeRecipient;
     }
 
     function getStrategyDetails(uint256 strategyIndex) external view returns (DataTypes.Strategy memory strategy) {
-        strategy = s_state.strategies[strategyIndex];
+        strategy = s_strategy.strategies[strategyIndex];
     }
 
     /*
@@ -236,12 +244,9 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         uint256 fee = _feeOnTotal(assets, getEntryFee());
 
         // Transfer entry fee to fee recipient (if fee exists and recipient is not this contract)
-        if (fee > 0 && s_feeRecipient != address(this)) {
-            i_asset.safeTransfer(s_feeRecipient, fee);
+        if (fee > 0 && s_vault.feeRecipient != address(this)) {
+            i_asset.safeTransfer(s_vault.feeRecipient, fee);
         }
-
-        // Supply remaining assets to strategy for yield generation
-        _allocateFundsInStrategies(assets.rawSub(fee));
     }
 
     /// @notice Internal function to handle withdrawals
@@ -256,28 +261,17 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         uint256 fee = _feeOnRaw(assets, getExitFee());
 
         // Transfer exit fee to fee recipient (if fee exists and recipient is not this contract)
-        if (fee > 0 && s_feeRecipient != address(this)) {
-            i_asset.safeTransfer(s_feeRecipient, fee);
+        if (fee > 0 && s_vault.feeRecipient != address(this)) {
+            i_asset.safeTransfer(s_vault.feeRecipient, fee);
         }
 
         uint256 assetsToTransfer = assets.rawSub(fee);
 
-        // Withdraw assets from strategy
-        // s_strategy.withdraw(assetsToTransfer, address(this), address(this));
+        // Withdraw assets from strategy (if required)
+        s_strategy.withdrawFunds(assetsToTransfer, i_asset);
 
         // Complete the withdrawal process
         super._withdraw(by, to, owner, assetsToTransfer, shares);
-    }
-
-    function _allocateFundsInStrategies(uint256 assetToDeposit) internal {
-        uint256 i = 0;
-
-        mapping(uint256 => DataTypes.Strategy) storage strategies = s_state.strategies;
-
-        for (i; i < s_state.totalStrategies; i++) {
-            SimpleTokenizedStrategy(strategies[i].strategy)
-                .deposit(assetToDeposit.mulDiv(strategies[i].allocation, BASIS_POINT_SCALE), address(this));
-        }
     }
 
     /// @notice Returns the number of decimals used by the underlying asset

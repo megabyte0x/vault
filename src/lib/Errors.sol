@@ -30,4 +30,8 @@ library Errors {
     error CannotWithdrawAllFundsFromStrategy();
 
     error NoChangeInAllocation();
+
+    error MinimumIdleAssetNotReached();
+
+    error NotEnoughFundsAvailable();
 }

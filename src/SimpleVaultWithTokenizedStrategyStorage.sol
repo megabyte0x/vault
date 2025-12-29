@@ -29,6 +29,8 @@ contract SimpleVaultWithTokenizedStrategyStorage {
 
     event SimpleVault__AllocationUpdated(address strategy, uint256 newAllocation);
 
+    event SimpleVault__FundsReallocated();
+
     /// @notice The underlying asset that the vault accepts (immutable)
     address internal immutable i_asset;
 
@@ -38,17 +40,10 @@ contract SimpleVaultWithTokenizedStrategyStorage {
     /// @notice Max number of strategies.
     uint256 internal constant MAX_STRATEGIES = 10;
 
-    /// @notice Entry fee charged on deposits, expressed in basis points
-    uint256 internal s_entryFee;
-
-    /// @notice Exit fee charged on withdrawals, expressed in basis points
-    uint256 internal s_exitFee;
-
-    /// @notice Address that receives collected fees
-    address internal s_feeRecipient;
+    DataTypes.VaultState internal s_vault;
 
     /// @notice State of the strategies.
-    DataTypes.State internal s_state;
+    DataTypes.StrategyState internal s_strategy;
 
     constructor(address asset_) {
         if (asset_ == address(0)) revert Errors.ZeroAddress();
