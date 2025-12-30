@@ -15,14 +15,16 @@ library Helpers {
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 internal constant BASIS_POINT_SCALE = 1e4;
 
-    uint256 internal constant MAX_STRATEGIES = 10;
-
     function currentTotalAllocation(DataTypes.StrategyState storage s) internal view returns (uint256 totalAllocation) {
         uint256 i = 0;
 
+        /// @dev Sum the allocation across strategies.
         for (i; i < s.totalStrategies; i++) {
             totalAllocation = totalAllocation.rawAdd(s.strategies[i].allocation);
         }
+
+        /// @dev Add the minimum idle allocation.
+        totalAllocation = totalAllocation.rawAdd(s.minimumIdleAssets);
     }
 
     function validateReallocateFunds(DataTypes.StrategyState storage s, uint256 totalAssets, address asset)
@@ -47,10 +49,11 @@ library Helpers {
         DataTypes.StrategyState storage s,
         address strategy,
         uint256 allocation,
-        address asset
+        address asset,
+        uint256 maxStrategies
     ) internal view {
         if (strategy == address(0)) revert Errors.ZeroAddress();
-        if (s.totalStrategies >= MAX_STRATEGIES) revert Errors.MaxStrategiesReached();
+        if (s.totalStrategies >= maxStrategies) revert Errors.MaxStrategiesReached();
         if (strategy.getAsset() != asset) revert Errors.WrongBaseAsset();
 
         if (s.strategyToIndex[strategy] != 0) revert Errors.StrategyAlreadyAdded();

@@ -50,4 +50,13 @@ library StrategyStateLogic {
     function changeAllocation(DataTypes.StrategyState storage s, address strategy, uint256 newAllocation) internal {
         s.strategies[s.strategyToIndex[strategy] - 1].allocation = newAllocation;
     }
+
+    /**
+     * This updates the `minimumIdleAssets` to `newMinimumIdleAssets`.
+     * @param s Current `StrategyState`
+     * @param newMinimumIdleAssets The new percentage of total assets as minimim idle assets, expressed in basis points.
+     */
+    function changeMimimumIdleAssets(DataTypes.StrategyState storage s, uint256 newMinimumIdleAssets) internal {
+        s.minimumIdleAssets = newMinimumIdleAssets;
+    }
 }

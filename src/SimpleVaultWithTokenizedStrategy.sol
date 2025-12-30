@@ -66,8 +66,14 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
     }
 
+    function setMinimumIdleAssets(uint256 newMinimumIdleAssets) external {
+        s_strategy.changeMimimumIdleAssets(newMinimumIdleAssets);
+
+        emit SimpleVault__MinimumIdleAssetsUpdated(newMinimumIdleAssets);
+    }
+
     function addStrategy(address strategy, uint256 allocation) external {
-        s_strategy.validateStrategyAddition(strategy, allocation, i_asset);
+        s_strategy.validateStrategyAddition(strategy, allocation, i_asset, MAX_STRATEGIES);
 
         s_strategy.addStrategy(strategy, allocation);
 

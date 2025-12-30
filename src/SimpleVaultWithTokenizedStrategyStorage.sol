@@ -31,6 +31,8 @@ contract SimpleVaultWithTokenizedStrategyStorage {
 
     event SimpleVault__FundsReallocated();
 
+    event SimpleVault__MinimumIdleAssetsUpdated(uint256 newMinimumIdleAssets);
+
     /// @notice The underlying asset that the vault accepts (immutable)
     address internal immutable i_asset;
 

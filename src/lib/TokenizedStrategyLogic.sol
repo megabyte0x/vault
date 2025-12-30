@@ -18,8 +18,6 @@ library TokenizedStrategyLogic {
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 internal constant BASIS_POINT_SCALE = 1e4;
 
-    uint256 internal constant MAX_STRATEGIES = 10;
-
     function getAssetBalanceInStrategy(address strategy) internal view returns (uint256 assets) {
         /// @dev 1. Get the number of strategy shares.
         uint256 strategySharesBalance = SimpleTokenizedStrategy(strategy).balanceOf(address(this));
