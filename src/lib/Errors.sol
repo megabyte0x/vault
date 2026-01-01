@@ -9,12 +9,6 @@ library Errors {
     /// @notice Thrown when a zero address is provided where a valid address is required
     error ZeroAddress();
 
-    /// @notice Thrown when invalid input parameters are provided to a function
-    error InvalidInputs();
-
-    /// @notice Thrown when deposit amount is below the minimum required threshold
-    error MinimumAssetRequired();
-
     error ZeroAmount();
 
     error MaxStrategiesReached();

@@ -2,11 +2,14 @@
 pragma solidity 0.8.30;
 
 import {ERC20} from "@solady/tokens/ERC20.sol";
+import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {Errors} from "../../src/lib/Errors.sol";
 import {BaseTestForVTS, VTS} from "../BaseTestForVTS.t.sol";
 
 contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
+    using FixedPointMathLib for uint256;
+
     function test_constructor() public {
         VTS newTSV = new VTS(networkConfig.usdc);
 
@@ -23,6 +26,8 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
 
     function test_setEntryFee() public {
         uint256 entryFeeInBPS = 100;
+
+        vm.prank(manager);
         vault.setEntryFee(entryFeeInBPS);
 
         assertEq(vault.getEntryFee(), entryFeeInBPS);
@@ -30,6 +35,8 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
 
     function test_setExitFee() public {
         uint256 exitFeeInBps = 100;
+
+        vm.prank(manager);
         vault.setExitFee(exitFeeInBps);
 
         assertEq(vault.getExitFee(), exitFeeInBps);
@@ -38,6 +45,7 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
     function test_setFeeRecipient() public {
         address newFeeRecipient = makeAddr("newRecipient");
 
+        vm.prank(manager);
         vault.setFeeRecipient(newFeeRecipient);
 
         assertEq(vault.getFeeRecipient(), newFeeRecipient);
@@ -45,7 +53,80 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
 
     function test_setFeeRecipient_withZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
+
+        vm.prank(manager);
         vault.setFeeRecipient(address(0));
+    }
+
+    function test_mimumIdleAssets() public {
+        uint256 minIdleAssets = 50; // 50 bps = 0.5 %
+
+        vm.prank(curator);
+        vault.setMinimumIdleAssets(minIdleAssets);
+
+        assertEq(vault.getMinimumIdleAssets(), minIdleAssets);
+    }
+
+    function test_addStrategy_FirstStrategyWithEmptyVault() public {
+        uint256 allocation = 90_00; // 90%
+
+        vm.prank(curator);
+        vault.addStrategy(address(strategy), allocation);
+
+        uint256 currentStrategyIndex = vault.getStrategyIndex(address(strategy));
+        uint256 expectedStrategyIndex = 0;
+
+        assertEq(currentStrategyIndex, expectedStrategyIndex);
+
+        uint256 currentTotalStrategies = vault.getTotalStrategies();
+        uint256 expectedTotalStrategies = 1;
+
+        assertEq(currentTotalStrategies, expectedTotalStrategies);
+    }
+
+    function test_addStrategy_FirstStrategyWithFundedVault() public {
+        uint256 allocation = 90_00; // 90%
+
+        _deposit(DEPOSIT_AMOUNT);
+
+        vm.prank(curator);
+        vault.addStrategy(address(strategy), allocation);
+    }
+
+    function test_addStrategy_StrategyWithZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(curator);
+        vault.addStrategy(address(0), 0);
+    }
+
+    function test_addStrategy_StrategyAlreadyAdded() public {
+        uint256 allocation = 90_00; // 90%
+
+        vm.startPrank(curator);
+        vault.addStrategy(address(strategy), allocation);
+        vm.expectRevert(Errors.StrategyAlreadyAdded.selector);
+        vault.addStrategy(address(strategy), BASIS_POINT_SCALE.rawSub(allocation));
+        vm.stopPrank();
+    }
+
+    function test_addStrategy_StrategyExceedingTotalAllocation() public {
+        uint256 minimumIdleAssetAllocation = 5_00; // 5%
+
+        vm.prank(curator);
+        vault.setMinimumIdleAssets(minimumIdleAssetAllocation);
+
+        uint256 allocation = 96_00; // 90%
+
+        vm.prank(curator);
+        vm.expectRevert(Errors.TotalAllocationExceeded.selector);
+        vault.addStrategy(address(strategy), allocation);
+    }
+
+    function test_addStrategy_StrategyWithZeroAllocation() public {
+        vm.prank(curator);
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vault.addStrategy(address(strategy), 0);
     }
 
     /*
@@ -88,5 +169,31 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
         uint8 epxectedDecimals = ERC20(networkConfig.usdc).decimals();
 
         assertEq(currentDecimals, epxectedDecimals);
+    }
+
+    // ==========================================================================
+
+    /**
+     *
+     * @notice Internal helper function to perform deposit operations
+     * @dev Handles approval and deposit in a single transaction
+     * @param depositAmount Amount of USDC to deposit
+     */
+    function _deposit(uint256 depositAmount) internal {
+        vm.startPrank(user);
+        ERC20(networkConfig.usdc).approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+    }
+
+    /**
+     *
+     * @notice Internal helper function to perform withdrawal operations
+     * @dev Withdraws specified amount to user's address
+     * @param withdrawAmount Amount of assets to withdraw
+     */
+    function _withdraw(uint256 withdrawAmount) internal {
+        vm.prank(user);
+        vault.withdraw(withdrawAmount, user, user);
     }
 }

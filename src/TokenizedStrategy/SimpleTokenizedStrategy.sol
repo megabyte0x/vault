@@ -2,8 +2,6 @@
 pragma solidity 0.8.30;
 
 import {Address} from "@openzeppelin/utils/Address.sol";
-import {IVaultV2 as IMorpho} from "@morpho/interfaces/IVaultV2.sol";
-
 import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 
 /**

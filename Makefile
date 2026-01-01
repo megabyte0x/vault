@@ -61,6 +61,10 @@ testWithdraw:
 testFuzz:
 	forge test --mt testFuzz $(FORK_NETWORK_ARGS) -vv	
 
+testVTS:
+	@forge test --mp ./test/unit/SimpleVaultWithTokenizedStrategy.t.sol $(FORK_NETWORK_ARGS) -vvv
+
+
 deploySimpleVault:
 	@forge script script/deploy/DeploySimpleVault.s.sol:DeploySimpleVault $(TENDERLY_NETWORK_ARGS)  --account dev
 
@@ -75,4 +79,5 @@ setup:
 
 depositInVault:
 	@forge script script/interactions/SimpleVault.s.sol:SimpleVault__Deposit $(TENDERLY_NETWORK_ARGS) --account dev
+
 

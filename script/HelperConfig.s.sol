@@ -92,13 +92,14 @@ contract HelperConfig is Script {
     }
 
     function getAnvilConfig() internal returns (NetworkConfig memory config) {
+        MockUSDC mockUSDC = new MockUSDC();
         config = NetworkConfig({
-            usdc: address(new MockUSDC()),
+            usdc: address(mockUSDC),
             morpho_vault: makeAddr("morpho_vault"),
             aave_pool: makeAddr("aave_pool"),
             entryFee: ENTRY_FEE,
             exitFee: EXIT_FEE,
-            usdc_holder: ETH_USDC_HOLDER
+            usdc_holder: address(this) // The HelperConfig contract deployed the MockUSDC and has the tokens
         });
     }
 

@@ -57,6 +57,9 @@ library TokenizedStrategyLogic {
 
         currentTotalAssets = totalAssetBalanceAcrossStrategies.rawAdd(currentIdleAssetBalance);
 
+        /// @dev Vault is empty, no funds to allocate.
+        if (currentTotalAssets == 0) return;
+
         uint256 targetIdleAssetBalance = currentTotalAssets.mulDiv(s.minimumIdleAssets, BASIS_POINT_SCALE);
 
         i = 0;
