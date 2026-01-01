@@ -4,6 +4,8 @@ pragma solidity 0.8.30;
 import {Script} from "forge-std/Script.sol";
 import {DevOpsTools} from "@devops/src/DevOpsTools.sol";
 
+import {MockUSDC} from "../test/mock/MockUSDC.sol";
+
 /// @title HelperConfig
 /// @notice Configuration contract for different network deployments
 /// @dev Provides network-specific addresses and parameters for vault deployment
@@ -53,9 +55,11 @@ contract HelperConfig is Script {
     /// @dev Currently only supports Ethereum mainnet (chain ID 1)
     /// @return config The network configuration struct
     //! TODO: Add support for other networks (testnets, L2s)
-    function getNetworkConfig() public view returns (NetworkConfig memory config) {
+    function getNetworkConfig() public returns (NetworkConfig memory config) {
         if (block.chainid == 1) {
             config = getMainnetConfig();
+        } else {
+            config = getAnvilConfig();
         }
     }
 
@@ -81,6 +85,17 @@ contract HelperConfig is Script {
             usdc: ETH_USDC,
             morpho_vault: ETH_MORPHO_VAULT,
             aave_pool: ETH_AAVE_POOL,
+            entryFee: ENTRY_FEE,
+            exitFee: EXIT_FEE,
+            usdc_holder: ETH_USDC_HOLDER
+        });
+    }
+
+    function getAnvilConfig() internal returns (NetworkConfig memory config) {
+        config = NetworkConfig({
+            usdc: address(new MockUSDC()),
+            morpho_vault: makeAddr("morpho_vault"),
+            aave_pool: makeAddr("aave_pool"),
             entryFee: ENTRY_FEE,
             exitFee: EXIT_FEE,
             usdc_holder: ETH_USDC_HOLDER
