@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
+import {AccessControl} from "@openzeppelin/access/AccessControl.sol";
 
 import {DataTypes} from "./lib/DataTypes.sol";
 import {Errors} from "./lib/Errors.sol";
@@ -17,7 +18,9 @@ import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenize
 /// @notice An ERC-4626 compliant vault that integrates with DeFi protocols through a pluggable strategy
 /// @dev Extends Solady's ERC4626 implementation with entry/exit fees and strategy delegation
 /// @author megabyte0x.eth
-contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategyStorage, ERC4626 {
+
+// aderyn-ignore-next-line(centralization-risk)
+contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategyStorage, ERC4626, AccessControl {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
     using Helpers for DataTypes.StrategyState;
@@ -27,7 +30,9 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     /// @notice Initializes the vault with the specified underlying asset
     /// @param asset_ The address of the ERC20 token to be used as the underlying asset
-    constructor(address asset_) SimpleVaultWithTokenizedStrategyStorage(asset_) {}
+    constructor(address asset_) SimpleVaultWithTokenizedStrategyStorage(asset_) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
 
     /*
        _____      _                        _   _____                 _   _
@@ -39,8 +44,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     /// @notice Sets the entry fee for deposits
     /// @param newEntryFee The new entry fee in basis points (e.g., 50 = 0.5%)
-    //! TODO: Add access control modifiers
-    function setEntryFee(uint256 newEntryFee) external {
+    function setEntryFee(uint256 newEntryFee) external onlyRole(MANAGER) {
         s_vault.updateEntryFee(newEntryFee);
 
         emit SimpleVault__EntryFeeUpdated(newEntryFee);
@@ -48,8 +52,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     /// @notice Sets the exit fee for withdrawals
     /// @param newExitFee The new exit fee in basis points (e.g., 100 = 1%)
-    //! TODO: Add access control modifiers
-    function setExitFee(uint256 newExitFee) external {
+    function setExitFee(uint256 newExitFee) external onlyRole(MANAGER) {
         s_vault.updateExitFee(newExitFee);
 
         emit SimpleVault__ExitFeeUpdated(newExitFee);
@@ -57,8 +60,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     /// @notice Sets the address that will receive collected fees
     /// @param newFeeRecipient The new fee recipient address (cannot be zero address)
-    //! TODO: Add access control modifiers
-    function setFeeRecipient(address newFeeRecipient) external {
+    function setFeeRecipient(address newFeeRecipient) external onlyRole(MANAGER) {
         if (newFeeRecipient == address(0)) revert Errors.ZeroAddress();
 
         s_vault.updateFeeRecipient(newFeeRecipient);
@@ -66,23 +68,25 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
     }
 
-    function setMinimumIdleAssets(uint256 newMinimumIdleAssets) external {
+    function setMinimumIdleAssets(uint256 newMinimumIdleAssets) external onlyRole(CURATOR) {
         s_strategy.changeMimimumIdleAssets(newMinimumIdleAssets);
 
         emit SimpleVault__MinimumIdleAssetsUpdated(newMinimumIdleAssets);
     }
 
-    function addStrategy(address strategy, uint256 allocation) external {
+    function addStrategy(address strategy, uint256 allocation) external onlyRole(CURATOR) {
         s_strategy.validateStrategyAddition(strategy, allocation, i_asset, MAX_STRATEGIES);
 
         s_strategy.addStrategy(strategy, allocation);
+
+        i_asset.safeApprove(strategy, type(uint256).max);
 
         s_strategy.reallocateFunds(i_asset);
 
         emit SimpleVault__TokenizedStrategyAdded(strategy, allocation);
     }
 
-    function removeStrategy(address strategy) external {
+    function removeStrategy(address strategy) external onlyRole(CURATOR) {
         s_strategy.validateStrategyRemoval(strategy);
 
         TokenizedStrategyLogic.withdrawMaxFunds(strategy);
@@ -94,7 +98,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__TokenizedStrategyRemoved(strategy);
     }
 
-    function changeStrategyAllocation(address strategy, uint256 newAllocation) external {
+    function changeStrategyAllocation(address strategy, uint256 newAllocation) external onlyRole(ALLOCATOR) {
         s_strategy.validateAllocationChange(strategy, newAllocation);
 
         s_strategy.changeAllocation(strategy, newAllocation);
@@ -104,7 +108,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
         emit SimpleVault__AllocationUpdated(strategy, newAllocation);
     }
 
-    function reallocateFunds() external {
+    function reallocateFunds() external onlyRole(ALLOCATOR) {
         s_strategy.validateReallocateFunds(totalAssets(), i_asset);
 
         s_strategy.reallocateFunds(i_asset);
@@ -227,6 +231,14 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     function getStrategyDetails(uint256 strategyIndex) external view returns (DataTypes.Strategy memory strategy) {
         strategy = s_strategy.strategies[strategyIndex];
+    }
+
+    function getMinimumIdleAssets() external view returns (uint256) {
+        return s_strategy.minimumIdleAssets;
+    }
+
+    function getTotalStrategies() external view returns (uint256) {
+        return s_strategy.totalStrategies;
     }
 
     /*

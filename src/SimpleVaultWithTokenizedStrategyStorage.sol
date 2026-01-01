@@ -9,29 +9,29 @@ contract SimpleVaultWithTokenizedStrategyStorage {
      * @notice Emitted when the entry fee is updated
      * @param newEntryFee The new entry fee in basis points
      */
-    event SimpleVault__EntryFeeUpdated(uint256 newEntryFee);
+    event SimpleVault__EntryFeeUpdated(uint256 indexed newEntryFee);
 
     /// @notice Emitted when the exit fee is updated
     /// @param newExitFee The new exit fee in basis points
-    event SimpleVault__ExitFeeUpdated(uint256 newExitFee);
+    event SimpleVault__ExitFeeUpdated(uint256 indexed newExitFee);
 
     /// @notice Emitted when the fee recipient address is updated
     /// @param newFeeRecipient The new address that will receive fees
-    event SimpleVault__FeeRecipientUpdated(address newFeeRecipient);
+    event SimpleVault__FeeRecipientUpdated(address indexed newFeeRecipient);
 
     /// @notice Emitted when the strategy contract is updated
     /// @param newStrategy The new strategy contract address
-    event SimpleVault__StrategyUpdated(address newStrategy);
+    event SimpleVault__StrategyUpdated(address indexed newStrategy);
 
-    event SimpleVault__TokenizedStrategyAdded(address strategy, uint256 allocation);
+    event SimpleVault__TokenizedStrategyAdded(address indexed strategy, uint256 indexed allocation);
 
-    event SimpleVault__TokenizedStrategyRemoved(address strategy);
+    event SimpleVault__TokenizedStrategyRemoved(address indexed strategy);
 
-    event SimpleVault__AllocationUpdated(address strategy, uint256 newAllocation);
+    event SimpleVault__AllocationUpdated(address indexed strategy, uint256 indexed newAllocation);
 
     event SimpleVault__FundsReallocated();
 
-    event SimpleVault__MinimumIdleAssetsUpdated(uint256 newMinimumIdleAssets);
+    event SimpleVault__MinimumIdleAssetsUpdated(uint256 indexed newMinimumIdleAssets);
 
     /// @notice The underlying asset that the vault accepts (immutable)
     address internal immutable i_asset;
@@ -41,6 +41,10 @@ contract SimpleVaultWithTokenizedStrategyStorage {
 
     /// @notice Max number of strategies.
     uint256 internal constant MAX_STRATEGIES = 10;
+
+    bytes32 public constant ALLOCATOR = keccak256("ALLOCATOR");
+    bytes32 public constant CURATOR = keccak256("CURATOR");
+    bytes32 public constant MANAGER = keccak256("MANAGER");
 
     DataTypes.VaultState internal s_vault;
 

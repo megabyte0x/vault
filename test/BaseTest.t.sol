@@ -31,6 +31,12 @@ contract BaseTest is Test {
     /// @notice Test user address for vault operations
     address user;
 
+    address manager;
+
+    address curator;
+
+    address allocator;
+
     /// @notice Amount of USDC to mint for testing (100M USDC)
     uint256 public constant USDC_TO_MINT = 100_000_000e6;
 
@@ -59,6 +65,9 @@ contract BaseTest is Test {
         // Create test addresses
         feeRecipient = makeAddr("FEE_RECIPIENT");
         user = makeAddr("USER");
+        manager = makeAddr("MANAGER");
+        curator = makeAddr("CURATOR");
+        allocator = makeAddr("ALLOCATOR");
 
         // Configure vault with strategy and fees
         vault.setStrategy(address(strategy));
