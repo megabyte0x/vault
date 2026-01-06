@@ -2,7 +2,17 @@
 pragma solidity 0.8.30;
 
 contract MockYieldSource {
-    function supply(address asset, uint256 amount) external {}
-    function withdraw(address asset, uint256 amount) external {}
-    function balanceOf(address user) external view returns (uint256) {}
+    mapping(address user => mapping(address asset => uint256 balance)) balances;
+
+    function supply(address asset, uint256 amount) external {
+        balances[msg.sender][asset] += amount;
+    }
+
+    function withdraw(address asset, uint256 amount) external {
+        balances[msg.sender][asset] -= amount;
+    }
+
+    function balanceOf(address asset, address user) external view returns (uint256) {
+        return balances[user][asset];
+    }
 }

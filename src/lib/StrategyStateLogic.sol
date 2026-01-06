@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "./Errors.sol";
 
 /**
  * @title State Logic
@@ -9,6 +10,21 @@ import {DataTypes} from "./DataTypes.sol";
  * @notice This library is used to update the internal `s_strategy` variable of the contract.
  */
 library StrategyStateLogic {
+    /**
+     * @notice Returns the `index` of `strategy`.
+     * @param s Current `State`
+     * @param strategy Strategy address to find `index` for
+     */
+    function getStrategyIndex(DataTypes.StrategyState storage s, address strategy)
+        internal
+        view
+        returns (uint256 index)
+    {
+        uint256 ip1 = s.strategyToIndex[strategy];
+        if (ip1 == 0) revert Errors.StrategyNotFound();
+        index = ip1 - 1;
+    }
+
     /**
      * @notice This adds the strategy in the `strategies` mapping, increase the `totalStrategies` by 1 and adds the updated `totalStrategy` as index in `strategyToIndex` for `newStrategy`.
      * @param s Current `State`

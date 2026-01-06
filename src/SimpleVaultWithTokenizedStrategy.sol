@@ -214,9 +214,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     }
 
     function getStrategyIndex(address strategy) external view returns (uint256 index) {
-        uint256 ip1 = s_strategy.strategyToIndex[strategy];
-        if (ip1 == 0) revert Errors.StrategyNotFound();
-        index = ip1 - 1;
+        return s_strategy.getStrategyIndex(strategy);
     }
 
     /// @notice Returns the current exit fee in basis points
@@ -239,6 +237,12 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     function getTotalStrategies() external view returns (uint256) {
         return s_strategy.totalStrategies;
+    }
+
+    function getAssetInStrategy(address strategy) external view returns (uint256 assets) {
+        assets = TokenizedStrategyLogic.getAssetBalanceInStrategy(
+            s_strategy.strategies[s_strategy.getStrategyIndex(strategy)].strategy
+        );
     }
 
     /*

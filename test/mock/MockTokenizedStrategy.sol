@@ -43,6 +43,6 @@ contract MockTokenizedStrategy is SimpleTokenizedStrategy {
     /// @dev Queries the aToken balance which represents deposits in Aave
     /// @return balance The amount of assets deposited in Aave
     function _getBalanceInAave() internal view returns (uint256 balance) {
-        balance = MockYieldSource(i_yieldSource).balanceOf(address(this));
+        balance = MockYieldSource(i_yieldSource).balanceOf(i_asset, address(this));
     }
 }

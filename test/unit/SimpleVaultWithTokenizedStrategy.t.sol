@@ -5,7 +5,7 @@ import {ERC20} from "@solady/tokens/ERC20.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {Errors} from "../../src/lib/Errors.sol";
-import {BaseTestForVTS, VTS} from "../BaseTestForVTS.t.sol";
+import {MockTokenizedStrategy, BaseTestForVTS, VTS} from "../BaseTestForVTS.t.sol";
 
 contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
     using FixedPointMathLib for uint256;
@@ -84,13 +84,51 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
         assertEq(currentTotalStrategies, expectedTotalStrategies);
     }
 
-    function test_addStrategy_FirstStrategyWithFundedVault() public {
+    function test_addStrategy_FirstStrategy() public {
         uint256 allocation = 90_00; // 90%
 
         _deposit(DEPOSIT_AMOUNT);
 
+        uint256 feeAmount = DEPOSIT_AMOUNT.mulDivUp(vault.getEntryFee(), vault.getEntryFee() + BASIS_POINT_SCALE);
+        uint256 finalDepositAmount = DEPOSIT_AMOUNT.rawSub(feeAmount);
+
+        _addStrategy(allocation);
+
+        uint256 assetsInStrategy = vault.getAssetInStrategy(address(strategy));
+
+        uint256 expectedAssetsInStrategy = finalDepositAmount.mulDiv(allocation, BASIS_POINT_SCALE);
+
+        assertEq(assetsInStrategy, expectedAssetsInStrategy);
+    }
+
+    function test_addStrategy_SecondStrategy() public {
+        uint256 firstStrategyAllocation = 85_00;
+        uint256 secondStrategyAllocation = 12_00;
+
+        uint256 feeAmount = DEPOSIT_AMOUNT.mulDivUp(vault.getEntryFee(), vault.getEntryFee() + BASIS_POINT_SCALE);
+        uint256 finalDepositAmount = DEPOSIT_AMOUNT.rawSub(feeAmount);
+
+        _deposit(DEPOSIT_AMOUNT);
+        _addStrategy(firstStrategyAllocation);
+
+        MockTokenizedStrategy strategy2 = new MockTokenizedStrategy(address(yieldSource), address(vault));
+
         vm.prank(curator);
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy2), secondStrategyAllocation);
+
+        uint256 assetsInStrategy1 = vault.getAssetInStrategy(address(strategy));
+        uint256 assetsInStrategy2 = vault.getAssetInStrategy(address(strategy2));
+
+        uint256 expectedAssetsInStrategy1 = finalDepositAmount.mulDiv(firstStrategyAllocation, BASIS_POINT_SCALE);
+        uint256 expectedAssetsInStrategy2 = finalDepositAmount.mulDiv(secondStrategyAllocation, BASIS_POINT_SCALE);
+
+        assertEq(assetsInStrategy1, expectedAssetsInStrategy1);
+        assertEq(assetsInStrategy2, expectedAssetsInStrategy2);
+
+        uint256 totalAssets = vault.totalAssets();
+        uint256 expectedTotalAssets = finalDepositAmount;
+
+        assertEq(totalAssets, expectedTotalAssets);
     }
 
     function test_addStrategy_StrategyWithZeroAddress() public {
@@ -115,7 +153,7 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
         vm.prank(curator);
         vault.setMinimumIdleAssets(minimumIdleAssetAllocation);
 
-        uint256 allocation = 96_00; // 90%
+        uint256 allocation = 96_00; // 96%
 
         vm.prank(curator);
         vm.expectRevert(Errors.TotalAllocationExceeded.selector);
@@ -195,5 +233,10 @@ contract SimpleVaultWithTokenizedStrategyTest is BaseTestForVTS {
     function _withdraw(uint256 withdrawAmount) internal {
         vm.prank(user);
         vault.withdraw(withdrawAmount, user, user);
+    }
+
+    function _addStrategy(uint256 allocation) internal {
+        vm.prank(curator);
+        vault.addStrategy(address(strategy), allocation);
     }
 }
