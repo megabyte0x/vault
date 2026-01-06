@@ -12,7 +12,6 @@ docs/
 
 # Dotenv file
 .env
-.claude
 coverage.txt
 lib
 !src/lib
@@ -24,4 +23,3 @@ crytic-export
 echidna
 medusa
 
-CLAUDE.md

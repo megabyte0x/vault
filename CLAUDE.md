@@ -10,6 +10,8 @@ This is an ERC-4626 vault implementation with two main variants:
 
 Both vaults accept ERC20 tokens, issue shares, and deploy assets through configurable strategies. The tokenized strategy variant supports multiple strategies with custom allocations.
 
+**Current Status**: Work in progress - SimpleVault core functionality is complete, tokenized strategy variant is actively being developed.
+
 ## Key Commands
 
 ### Building and Testing
@@ -24,12 +26,15 @@ make test
 # or
 forge test --fork-url mainnet --block-number ${BLOCK_NUMBER} --etherscan-api-key etherscan_api_key
 
-# Run specific tests with verbose output
+# Run specific test suites
 make testDeposit         # Test deposit functionality
 make testWithdraw        # Test withdrawal functionality
 make testTotalSupply     # Test total supply calculations
-make testFuzz           # Run fuzz tests
+make testFuzz           # Run fuzz tests (1000 runs configured)
 make testVTS            # Run Vault with Tokenized Strategy tests
+
+# Run individual test functions
+forge test --mt <test_function_name> --fork-url mainnet --block-number ${BLOCK_NUMBER}
 
 # Format code
 make format
@@ -86,12 +91,17 @@ make clean
 - Uses library-based architecture for gas optimization and modularity
 - Implements AccessControl for role-based permissions (MANAGER role)
 - Maintains minimum idle asset ratios for liquidity management
+- Storage contract: `SimpleVaultWithTokenizedStrategyStorage.sol`
 
 **SimpleStrategy** (`src/SimpleStrategy.sol`):
 - Single-strategy implementation splitting 80% of deposits equally between:
   - Aave Pool (40% of total deposit)
   - Morpho Vault (40% of total deposit)
 - Remaining 20% stays in vault as reserve/liquidity
+
+**Tokenized Strategies** (`src/TokenizedStrategy/`):
+- `SimpleTokenizedStrategy.sol`: Base tokenized strategy implementation
+- `AaveTokenizedStrategy.sol`: Aave-specific tokenized strategy
 
 ### Library Architecture (SimpleVaultWithTokenizedStrategy)
 
@@ -135,21 +145,29 @@ Tests use Foundry's testing framework with mainnet forking:
   - `SimpleVaultWithTokenizedStrategy.t.sol`: Tests for advanced vault
   - `SimpleStrategy.t.sol`: Tests for strategy implementation
 - `test/fuzz/`: Fuzz testing for edge cases
+  - `SimpleVault.t.sol`: Fuzz tests for vault operations
 - `test/BaseTest.t.sol`: Base test contract for SimpleVault
 - `test/BaseTestForVTS.t.sol`: Base test contract for tokenized strategy vault
+- Mock contracts in `test/mock/`:
+  - `MockTokenizedStrategy.sol`: Mock strategy for testing
+  - `MockYieldSource.sol`: Mock yield source for testing
 
 **Fork Configuration**:
 - Fork-based testing against live DeFi protocols
 - USDC minting for test scenarios (100M USDC test amount)
 - Integration with HelperConfig for network-specific addresses
 - Environment variable `BLOCK_NUMBER` for consistent fork state
+- Fuzz test runs: 1000 (configured in foundry.toml)
 
 ## Environment Requirements
 
-- Mainnet RPC URL for fork testing
-- Etherscan API key for contract verification
-- Tenderly access key and RPC for deployment to Tenderly Virtual TestNet
-- Environment variables defined in `.env` file
+Required environment variables in `.env` file:
+- `MAINNET_RPC_URL`: Mainnet RPC endpoint for fork testing
+- `ETHERSCAN_KEY`: Etherscan API key for contract verification
+- `BLOCK_NUMBER`: Block number for consistent mainnet fork state
+- `TENDERLY_ACCESS_KEY`: Tenderly access key for deployment
+- `TENDERLY_VIRTUAL_TESTNET_RPC`: Tenderly Virtual TestNet RPC URL
+- `TENDERLY_VERIFIER_URL`: Tenderly verifier URL for contract verification
 
 ## Development Workflow
 
