@@ -61,7 +61,7 @@ contract BaseTestForVTS is Test {
 
     /// @notice Sets up test environment with vault, strategy, and test accounts
     /// @dev Creates fresh contracts and configures them with network-specific addresses
-    function setUp() public {
+    function setUp() public virtual {
         HelperConfig config = new HelperConfig();
         networkConfig = config.getNetworkConfig();
 

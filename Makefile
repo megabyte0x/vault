@@ -62,7 +62,7 @@ testFuzz:
 	forge test --mt testFuzz $(FORK_NETWORK_ARGS) -vv	
 
 testVTS:
-	@forge test --mp ./test/unit/SimpleVaultWithTokenizedStrategy.t.sol $(FORK_NETWORK_ARGS) -vvv
+	@forge test --mp ./test/unit/VTS.t.sol $(FORK_NETWORK_ARGS) && forge test --mp ./test/unit/VTS/RemoveStrategy.t.sol $(FORK_NETWORK_ARGS) && forge test --mp ./test/unit/VTS/AddStrategy.t.sol $(FORK_NETWORK_ARGS) 
 
 
 deploySimpleVault:
