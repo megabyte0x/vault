@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "forge-std/Test.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
-import {SimpleVaultWithTokenizedStrategyHarness as VTS} from "./harness/SimpleVaultWithTokenizedStrategyHarness.sol";
+import {SimpleVTSHarness as VTS} from "./harness/SimpleVTSHarness.sol";
 import {MockTokenizedStrategy} from "./mock/MockTokenizedStrategy.sol";
 import {MockYieldSource} from "./mock/MockYieldSource.sol";
 

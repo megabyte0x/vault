@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.30;
 
-import {SimpleVaultWithTokenizedStrategy} from "../../src/SimpleVaultWithTokenizedStrategy.sol";
+import {SimpleVTS} from "../../src/SimpleVTS.sol";
 
-contract SimpleVaultWithTokenizedStrategyHarness is SimpleVaultWithTokenizedStrategy {
-    constructor(address _asset) SimpleVaultWithTokenizedStrategy(_asset) {}
+contract SimpleVTSHarness is SimpleVTS {
+    constructor(address _asset) SimpleVTS(_asset) {}
 
     function underlyingDecimals() external view returns (uint8) {
         return _underlyingDecimals();

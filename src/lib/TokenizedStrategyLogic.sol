@@ -192,4 +192,15 @@ library TokenizedStrategyLogic {
 
         revert Errors.NotEnoughFundsAvailable();
     }
+
+    function emergencyWithdraw(DataTypes.StrategyState storage s) internal {
+        uint256 i = 0;
+        for (i; i < s.totalStrategies; i++) {
+            uint256 maxWithdrawable = SimpleTokenizedStrategy(s.strategies[i].strategy).maxWithdraw(address(this));
+
+            if (maxWithdrawable == 0) continue;
+
+            SimpleTokenizedStrategy(s.strategies[i].strategy).withdraw(maxWithdrawable, address(this), address(this));
+        }
+    }
 }

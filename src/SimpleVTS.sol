@@ -12,7 +12,7 @@ import {Helpers} from "./lib/Helpers.sol";
 import {StrategyStateLogic} from "./lib/StrategyStateLogic.sol";
 import {VaultStateLogic} from "./lib/VaultStateLogic.sol";
 import {TokenizedStrategyLogic} from "./lib/TokenizedStrategyLogic.sol";
-import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenizedStrategyStorage.sol";
+import {SimpleVTS__Storage} from "./SimpleVTS__Storage.sol";
 
 /// @title SimpleVault
 /// @notice An ERC-4626 compliant vault that integrates with DeFi protocols through a pluggable strategy
@@ -20,7 +20,7 @@ import {SimpleVaultWithTokenizedStrategyStorage} from "./SimpleVaultWithTokenize
 /// @author megabyte0x.eth
 
 // aderyn-ignore-next-line(centralization-risk)
-contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategyStorage, ERC4626, AccessControl {
+contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
     using Helpers for DataTypes.StrategyState;
@@ -30,7 +30,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
     /// @notice Initializes the vault with the specified underlying asset
     /// @param asset_ The address of the ERC20 token to be used as the underlying asset
-    constructor(address asset_) SimpleVaultWithTokenizedStrategyStorage(asset_) {
+    constructor(address asset_) SimpleVTS__Storage(asset_) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -47,7 +47,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function setEntryFee(uint256 newEntryFee) external onlyRole(MANAGER) {
         s_vault.updateEntryFee(newEntryFee);
 
-        emit SimpleVault__EntryFeeUpdated(newEntryFee);
+        emit SimpleVTS__EntryFeeUpdated(newEntryFee);
     }
 
     /// @notice Sets the exit fee for withdrawals
@@ -55,7 +55,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
     function setExitFee(uint256 newExitFee) external onlyRole(MANAGER) {
         s_vault.updateExitFee(newExitFee);
 
-        emit SimpleVault__ExitFeeUpdated(newExitFee);
+        emit SimpleVTS__ExitFeeUpdated(newExitFee);
     }
 
     /// @notice Sets the address that will receive collected fees
@@ -65,13 +65,13 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         s_vault.updateFeeRecipient(newFeeRecipient);
 
-        emit SimpleVault__FeeRecipientUpdated(newFeeRecipient);
+        emit SimpleVTS__FeeRecipientUpdated(newFeeRecipient);
     }
 
     function setMinimumIdleAssets(uint256 newMinimumIdleAssets) external onlyRole(CURATOR) {
         s_strategy.changeMimimumIdleAssets(newMinimumIdleAssets);
 
-        emit SimpleVault__MinimumIdleAssetsUpdated(newMinimumIdleAssets);
+        emit SimpleVTS__MinimumIdleAssetsUpdated(newMinimumIdleAssets);
     }
 
     function addStrategy(address strategy, uint256 allocation) external onlyRole(CURATOR) {
@@ -83,7 +83,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         s_strategy.reallocateFunds(i_asset);
 
-        emit SimpleVault__TokenizedStrategyAdded(strategy, allocation);
+        emit SimpleVTS__TokenizedStrategyAdded(strategy, allocation);
     }
 
     function removeStrategy(address strategy) external onlyRole(CURATOR) {
@@ -95,7 +95,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         s_strategy.reallocateFunds(i_asset);
 
-        emit SimpleVault__TokenizedStrategyRemoved(strategy);
+        emit SimpleVTS__TokenizedStrategyRemoved(strategy);
     }
 
     function changeStrategyAllocation(address strategy, uint256 newAllocation) external onlyRole(ALLOCATOR) {
@@ -105,7 +105,7 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         s_strategy.reallocateFunds(i_asset);
 
-        emit SimpleVault__AllocationUpdated(strategy, newAllocation);
+        emit SimpleVTS__AllocationUpdated(strategy, newAllocation);
     }
 
     function reallocateFunds() external onlyRole(ALLOCATOR) {
@@ -113,7 +113,13 @@ contract SimpleVaultWithTokenizedStrategy is SimpleVaultWithTokenizedStrategySto
 
         s_strategy.reallocateFunds(i_asset);
 
-        emit SimpleVault__FundsReallocated();
+        emit SimpleVTS__FundsReallocated();
+    }
+
+    function emergencyWithdrawFunds() external onlyRole(MANAGER) {
+        s_strategy.emergencyWithdraw();
+
+        emit SimpleVTS__EmergencyWithdrawFunds();
     }
 
     /*

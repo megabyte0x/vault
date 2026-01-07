@@ -5,7 +5,7 @@ import {ERC20} from "@solady/tokens/ERC20.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {Errors} from "../../../src/lib/Errors.sol";
-import {MockTokenizedStrategy, BaseTestForVTS} from "../../BaseTestForVTS.t.sol";
+import {BaseTestForVTS} from "../../BaseTestForVTS.t.sol";
 
 /**
  * @title RemoveStrategy Test Suite for SimpleVaultWithTokenizedStrategy
