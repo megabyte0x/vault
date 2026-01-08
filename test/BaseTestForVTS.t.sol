@@ -65,8 +65,10 @@ contract BaseTestForVTS is Test {
         HelperConfig config = new HelperConfig();
         networkConfig = config.getNetworkConfig();
 
+        address admin = address(this);
+
         // Deploy vault and strategy contracts
-        vault = new VTS(networkConfig.usdc);
+        vault = new VTS(networkConfig.usdc, admin);
 
         yieldSource = new MockYieldSource();
 

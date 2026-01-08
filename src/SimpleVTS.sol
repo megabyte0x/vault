@@ -217,7 +217,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
 
             uint256 currentBalance = TokenizedStrategyLogic.getAssetBalanceInStrategy(strategy.strategy);
 
-            maxAssets = maxAssets.rawAdd(currentBalance);
+            maxAssets = maxAssets.rawAdd(cap.zeroFloorSub(currentBalance));
         }
     }
 

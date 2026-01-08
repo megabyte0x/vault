@@ -29,20 +29,20 @@ contract MockTokenizedStrategy is SimpleTokenizedStrategy {
         super._deposit(by, to, assets, shares);
 
         // Supply to Aave
-        i_asset.safeApprove(i_yieldSource, assets);
-        MockYieldSource(i_yieldSource).supply(i_asset, assets);
+        asset().safeApprove(i_yieldSource, assets);
+        MockYieldSource(i_yieldSource).supply(asset(), assets);
     }
 
     function _withdraw(address by, address to, address owner, uint256 assets, uint256 shares) internal override {
         super._withdraw(by, to, owner, assets, shares);
 
-        MockYieldSource(i_yieldSource).withdraw(i_asset, assets);
+        MockYieldSource(i_yieldSource).withdraw(asset(), assets);
     }
 
     /// @notice Gets the balance of assets deposited in Aave
     /// @dev Queries the aToken balance which represents deposits in Aave
     /// @return balance The amount of assets deposited in Aave
     function _getBalanceInAave() internal view returns (uint256 balance) {
-        balance = MockYieldSource(i_yieldSource).balanceOf(i_asset, address(this));
+        balance = MockYieldSource(i_yieldSource).balanceOf(asset(), address(this));
     }
 }

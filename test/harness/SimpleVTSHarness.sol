@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {SimpleVTS} from "../../src/SimpleVTS.sol";
 
 contract SimpleVTSHarness is SimpleVTS {
-    constructor(address _asset) SimpleVTS(_asset) {}
+    constructor(address _asset, address _admin) SimpleVTS(_asset, _admin) {}
 
     function underlyingDecimals() external view returns (uint8) {
         return _underlyingDecimals();

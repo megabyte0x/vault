@@ -35,6 +35,7 @@ library StrategyStateLogic {
         s.strategies[s.totalStrategies] = DataTypes.Strategy({strategy: newStrategy, cap: cap});
         /// @dev Index + 1, this will prevent any addition to 0 index.
         s.strategyToIndex[newStrategy] = ++s.totalStrategies;
+        //! TODO: Manage supply queue
     }
 
     /**

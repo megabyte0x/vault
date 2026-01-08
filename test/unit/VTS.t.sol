@@ -11,7 +11,7 @@ contract VTSTest is BaseTestForVTS {
     using FixedPointMathLib for uint256;
 
     function test_constructor() public {
-        VTS newTSV = new VTS(networkConfig.usdc);
+        VTS newTSV = new VTS(networkConfig.usdc, address(this));
 
         assertEq(newTSV.asset(), networkConfig.usdc);
     }

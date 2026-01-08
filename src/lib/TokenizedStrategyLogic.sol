@@ -154,12 +154,12 @@ library TokenizedStrategyLogic {
         uint256 i = 0;
         uint256[] memory withdrawQueue = s.withdrawQueue;
         for (i; i < withdrawQueue.length; i++) {
-            uint256 maxWithdrawable =
-                SimpleTokenizedStrategy(s.strategies[withdrawQueue[i]].strategy).maxWithdraw(address(this));
+            address strategyAddress = s.strategies[withdrawQueue[i]].strategy;
+            uint256 maxWithdrawable = SimpleTokenizedStrategy(strategyAddress).maxWithdraw(address(this));
 
             if (maxWithdrawable == 0) continue;
 
-            SimpleTokenizedStrategy(s.strategies[i].strategy).withdraw(maxWithdrawable, address(this), address(this));
+            SimpleTokenizedStrategy(strategyAddress).withdraw(maxWithdrawable, address(this), address(this));
         }
     }
 }
