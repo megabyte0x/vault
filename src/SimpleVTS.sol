@@ -23,9 +23,9 @@ import {SimpleVTS__Storage} from "./SimpleVTS__Storage.sol";
 contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
+    using TokenizedStrategyLogic for DataTypes.StrategyState;
     using Helpers for DataTypes.StrategyState;
     using StrategyStateLogic for DataTypes.StrategyState;
-    using TokenizedStrategyLogic for DataTypes.StrategyState;
     using VaultStateLogic for DataTypes.VaultState;
 
     /// @notice Initializes the vault with the specified underlying asset
@@ -68,50 +68,42 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
         emit SimpleVTS__FeeRecipientUpdated(newFeeRecipient);
     }
 
-    function setMinimumIdleAssets(uint256 newMinimumIdleAssets) external onlyRole(CURATOR) {
-        s_strategy.changeMimimumIdleAssets(newMinimumIdleAssets);
+    function addStrategy(address strategy, uint256 cap) external onlyRole(CURATOR) {
+        s_strategy.validateStrategyAddition(strategy, i_asset, MAX_STRATEGIES);
 
-        emit SimpleVTS__MinimumIdleAssetsUpdated(newMinimumIdleAssets);
-    }
-
-    function addStrategy(address strategy, uint256 allocation) external onlyRole(CURATOR) {
-        s_strategy.validateStrategyAddition(strategy, allocation, i_asset, MAX_STRATEGIES);
-
-        s_strategy.addStrategy(strategy, allocation);
+        //! TODO: This needs to be timelocked
+        s_strategy.addStrategy(strategy, cap);
 
         i_asset.safeApprove(strategy, type(uint256).max);
 
-        s_strategy.reallocateFunds(i_asset);
-
-        emit SimpleVTS__TokenizedStrategyAdded(strategy, allocation);
+        emit SimpleVTS__TokenizedStrategyAdded(strategy, cap);
     }
 
     function removeStrategy(address strategy) external onlyRole(CURATOR) {
         s_strategy.validateStrategyRemoval(strategy);
 
+        //! TODO: This needs to be timelocked
         TokenizedStrategyLogic.withdrawMaxFunds(strategy);
-
         s_strategy.removeStrategy(strategy);
-
-        s_strategy.reallocateFunds(i_asset);
 
         emit SimpleVTS__TokenizedStrategyRemoved(strategy);
     }
 
-    function changeStrategyAllocation(address strategy, uint256 newAllocation) external onlyRole(ALLOCATOR) {
-        s_strategy.validateAllocationChange(strategy, newAllocation);
+    function changeStrategyCap(address strategy, uint256 newCap) external onlyRole(ALLOCATOR) {
+        s_strategy.validateCapChange(strategy, newCap);
 
-        s_strategy.changeAllocation(strategy, newAllocation);
+        //! TODO: This needs to be timelocked
+        s_strategy.changeCap(strategy, newCap);
 
-        s_strategy.reallocateFunds(i_asset);
+        // s_strategy.reallocateFunds(i_asset);
 
-        emit SimpleVTS__AllocationUpdated(strategy, newAllocation);
+        emit SimpleVTS__CapUpdated(strategy, newCap);
     }
 
-    function reallocateFunds() external onlyRole(ALLOCATOR) {
+    function reallocateFunds(uint256[] calldata allocations) external onlyRole(ALLOCATOR) {
         s_strategy.validateReallocateFunds(totalAssets(), i_asset);
 
-        s_strategy.reallocateFunds(i_asset);
+        s_strategy.reallocateFunds(allocations);
 
         emit SimpleVTS__FundsReallocated();
     }
@@ -237,10 +229,6 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
         strategy = s_strategy.strategies[strategyIndex];
     }
 
-    function getMinimumIdleAssets() external view returns (uint256) {
-        return s_strategy.minimumIdleAssets;
-    }
-
     function getTotalStrategies() external view returns (uint256) {
         return s_strategy.totalStrategies;
     }
@@ -259,47 +247,29 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
       |___|_| |_|\__\___|_|  |_| |_|\__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
     */
 
-    /// @notice Internal function to handle deposits
-    /// @inheritdoc ERC4626
-    /// @dev Transfers entry fees to fee recipient and supplies remaining assets to strategy
-    /// @param by The address initiating the deposit
-    /// @param to The address receiving the shares
-    /// @param assets The total amount of assets being deposited
-    /// @param shares The amount of shares being minted
-    function _deposit(address by, address to, uint256 assets, uint256 shares) internal override {
-        super._deposit(by, to, assets, shares);
-
+    function _afterDeposit(uint256 assets, uint256 shares) internal override {
         uint256 fee = _feeOnTotal(assets, getEntryFee());
 
         // Transfer entry fee to fee recipient (if fee exists and recipient is not this contract)
         if (fee > 0 && s_vault.feeRecipient != address(this)) {
             i_asset.safeTransfer(s_vault.feeRecipient, fee);
         }
+
+        assets = assets.rawSub(fee);
+
+        s_strategy.depositFunds(assets);
     }
 
-    /// @notice Internal function to handle withdrawals
-    /// @inheritdoc ERC4626
-    /// @dev Withdraws assets from strategy, transfers exit fees, and processes withdrawal
-    /// @param by The address initiating the withdrawal
-    /// @param to The address receiving the assets
-    /// @param owner The address owning the shares being burned
-    /// @param assets The total amount of assets being withdrawn
-    /// @param shares The amount of shares being burned
-    function _withdraw(address by, address to, address owner, uint256 assets, uint256 shares) internal override {
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal override {
+        // Withdraw assets from strategies
+        s_strategy.withdrawFunds(assets);
+
         uint256 fee = _feeOnRaw(assets, getExitFee());
 
         // Transfer exit fee to fee recipient (if fee exists and recipient is not this contract)
         if (fee > 0 && s_vault.feeRecipient != address(this)) {
             i_asset.safeTransfer(s_vault.feeRecipient, fee);
         }
-
-        uint256 assetsToTransfer = assets.rawSub(fee);
-
-        // Withdraw assets from strategy (if required)
-        s_strategy.withdrawFunds(assetsToTransfer, i_asset);
-
-        // Complete the withdrawal process
-        super._withdraw(by, to, owner, assetsToTransfer, shares);
     }
 
     /// @notice Returns the number of decimals used by the underlying asset

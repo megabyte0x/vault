@@ -23,11 +23,11 @@ contract SimpleVTS__Storage {
     /// @param newStrategy The new strategy contract address
     event SimpleVTS__StrategyUpdated(address indexed newStrategy);
 
-    event SimpleVTS__TokenizedStrategyAdded(address indexed strategy, uint256 indexed allocation);
+    event SimpleVTS__TokenizedStrategyAdded(address indexed strategy, uint256 indexed cap);
 
     event SimpleVTS__TokenizedStrategyRemoved(address indexed strategy);
 
-    event SimpleVTS__AllocationUpdated(address indexed strategy, uint256 indexed newAllocation);
+    event SimpleVTS__CapUpdated(address indexed strategy, uint256 indexed newCap);
 
     event SimpleVTS__FundsReallocated();
 

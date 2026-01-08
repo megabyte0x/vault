@@ -13,7 +13,7 @@ library Errors {
 
     error MaxStrategiesReached();
 
-    error TotalAllocationExceeded();
+    error TotalCapExceeded();
 
     error StrategyAlreadyAdded();
 
@@ -23,9 +23,13 @@ library Errors {
 
     error CannotWithdrawAllFundsFromStrategy();
 
-    error NoChangeInAllocation();
+    error NoChangeInCap();
 
     error MinimumIdleAssetNotReached();
 
     error NotEnoughFundsAvailable();
+
+    error AllCapsReached();
+
+    error NotEnoughLiquidity();
 }

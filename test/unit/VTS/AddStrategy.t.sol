@@ -20,9 +20,9 @@ contract AddStrategy__VTS is BaseTestForVTS {
      * @dev Verifies strategy index and total strategies count are correctly set
      */
     function test_addStrategy_FirstStrategyWithEmptyVault() public {
-        uint256 allocation = 90_00; // 90%
+        uint256 cap = 90_00; // 90%
 
-        _addStrategy(allocation);
+        _addStrategy(cap);
 
         uint256 currentStrategyIndex = vault.getStrategyIndex(address(strategy));
         uint256 expectedStrategyIndex = 0;
@@ -37,49 +37,49 @@ contract AddStrategy__VTS is BaseTestForVTS {
 
     /**
      * @notice Test adding first strategy after deposits have been made
-     * @dev Verifies funds are correctly allocated to the strategy based on allocation percentage
+     * @dev Verifies funds are correctly allocated to the strategy based on cap percentage
      */
     function test_addStrategy_FirstStrategy() public {
-        uint256 allocation = 90_00; // 90%
+        uint256 cap = 90_00; // 90%
 
         _deposit(DEPOSIT_AMOUNT);
 
         uint256 feeAmount = DEPOSIT_AMOUNT.mulDivUp(vault.getEntryFee(), vault.getEntryFee() + BASIS_POINT_SCALE);
         uint256 finalDepositAmount = DEPOSIT_AMOUNT.rawSub(feeAmount);
 
-        _addStrategy(allocation);
+        _addStrategy(cap);
 
         uint256 assetsInStrategy = vault.getAssetInStrategy(address(strategy));
 
-        uint256 expectedAssetsInStrategy = finalDepositAmount.mulDiv(allocation, BASIS_POINT_SCALE);
+        uint256 expectedAssetsInStrategy = finalDepositAmount.mulDiv(cap, BASIS_POINT_SCALE);
 
         assertEq(assetsInStrategy, expectedAssetsInStrategy);
     }
 
     /**
      * @notice Test adding a second strategy to vault with existing strategy
-     * @dev Verifies multiple strategies can coexist with proper allocations and total assets tracking
+     * @dev Verifies multiple strategies can coexist with proper caps and total assets tracking
      */
     function test_addStrategy_SecondStrategy() public {
-        uint256 firstStrategyAllocation = 85_00;
-        uint256 secondStrategyAllocation = 12_00;
+        uint256 firstStrategyCap = 85_00;
+        uint256 secondStrategyCap = 12_00;
 
         uint256 feeAmount = DEPOSIT_AMOUNT.mulDivUp(vault.getEntryFee(), vault.getEntryFee() + BASIS_POINT_SCALE);
         uint256 finalDepositAmount = DEPOSIT_AMOUNT.rawSub(feeAmount);
 
         _deposit(DEPOSIT_AMOUNT);
-        _addStrategy(firstStrategyAllocation);
+        _addStrategy(firstStrategyCap);
 
         MockTokenizedStrategy strategy2 = new MockTokenizedStrategy(address(yieldSource), address(vault));
 
         vm.prank(curator);
-        vault.addStrategy(address(strategy2), secondStrategyAllocation);
+        vault.addStrategy(address(strategy2), secondStrategyCap);
 
         uint256 assetsInStrategy1 = vault.getAssetInStrategy(address(strategy));
         uint256 assetsInStrategy2 = vault.getAssetInStrategy(address(strategy2));
 
-        uint256 expectedAssetsInStrategy1 = finalDepositAmount.mulDiv(firstStrategyAllocation, BASIS_POINT_SCALE);
-        uint256 expectedAssetsInStrategy2 = finalDepositAmount.mulDiv(secondStrategyAllocation, BASIS_POINT_SCALE);
+        uint256 expectedAssetsInStrategy1 = finalDepositAmount.mulDiv(firstStrategyCap, BASIS_POINT_SCALE);
+        uint256 expectedAssetsInStrategy2 = finalDepositAmount.mulDiv(secondStrategyCap, BASIS_POINT_SCALE);
 
         assertEq(assetsInStrategy1, expectedAssetsInStrategy1);
         assertEq(assetsInStrategy2, expectedAssetsInStrategy2);
@@ -105,37 +105,32 @@ contract AddStrategy__VTS is BaseTestForVTS {
      * @dev Expects revert with StrategyAlreadyAdded error when adding same strategy twice
      */
     function test_addStrategy_StrategyAlreadyAdded() public {
-        uint256 allocation = 90_00; // 90%
+        uint256 cap = 90_00; // 90%
 
         vm.startPrank(curator);
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
         vm.expectRevert(Errors.StrategyAlreadyAdded.selector);
-        vault.addStrategy(address(strategy), BASIS_POINT_SCALE.rawSub(allocation));
+        vault.addStrategy(address(strategy), BASIS_POINT_SCALE.rawSub(cap));
         vm.stopPrank();
     }
 
     /**
-     * @notice Test that adding strategy exceeding total allocation limit reverts
-     * @dev Expects revert when strategy allocation plus minimum idle assets exceeds 100%
+     * @notice Test that adding strategy exceeding total cap limit reverts
+     * @dev Expects revert when strategy cap plus minimum idle assets exceeds 100%
      */
-    function test_addStrategy_StrategyExceedingTotalAllocation() public {
-        uint256 minimumIdleAssetAllocation = 5_00; // 5%
+    function test_addStrategy_StrategyExceedingTotalCap() public {
+        uint256 cap = 96_00; // 96%
 
         vm.prank(curator);
-        vault.setMinimumIdleAssets(minimumIdleAssetAllocation);
-
-        uint256 allocation = 96_00; // 96%
-
-        vm.prank(curator);
-        vm.expectRevert(Errors.TotalAllocationExceeded.selector);
-        vault.addStrategy(address(strategy), allocation);
+        vm.expectRevert(Errors.TotalCapExceeded.selector);
+        vault.addStrategy(address(strategy), cap);
     }
 
     /**
-     * @notice Test that adding strategy with zero allocation reverts
+     * @notice Test that adding strategy with zero cap reverts
      * @dev Expects revert with ZeroAmount error
      */
-    function test_addStrategy_StrategyWithZeroAllocation() public {
+    function test_addStrategy_StrategyWithZeroCap() public {
         vm.prank(curator);
 
         vm.expectRevert(Errors.ZeroAmount.selector);
@@ -168,11 +163,11 @@ contract AddStrategy__VTS is BaseTestForVTS {
 
     /**
      * @notice Internal helper function to add strategy as curator
-     * @dev Pranks as curator to add strategy with specified allocation
-     * @param allocation Allocation percentage in basis points (10000 = 100%)
+     * @dev Pranks as curator to add strategy with specified cap
+     * @param cap Cap percentage in basis points (10000 = 100%)
      */
-    function _addStrategy(uint256 allocation) internal {
+    function _addStrategy(uint256 cap) internal {
         vm.prank(curator);
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
     }
 }

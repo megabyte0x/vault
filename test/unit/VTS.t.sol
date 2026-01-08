@@ -58,15 +58,6 @@ contract VTSTest is BaseTestForVTS {
         vault.setFeeRecipient(address(0));
     }
 
-    function test_mimumIdleAssets() public {
-        uint256 minIdleAssets = 50; // 50 bps = 0.5 %
-
-        vm.prank(curator);
-        vault.setMinimumIdleAssets(minIdleAssets);
-
-        assertEq(vault.getMinimumIdleAssets(), minIdleAssets);
-    }
-
     /*
        ____  _   _ ____  _     ___ ____   _____ _   _ _   _  ____ _____ ___ ___  _   _ ____
       |  _ \| | | | __ )| |   |_ _/ ___| |  ___| | | | \ | |/ ___|_   _|_ _/ _ \| \ | / ___|

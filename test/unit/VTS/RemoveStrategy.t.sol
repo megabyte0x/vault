@@ -20,14 +20,14 @@ contract RemoveStrategy__VTS is BaseTestForVTS {
      * @dev Verifies that funds are properly withdrawn from strategy back to vault
      */
     function test_removeStrategy_WhenOneStrategyExists() public {
-        uint256 allocation = 90_00;
+        uint256 cap = 90_00;
 
         _deposit(DEPOSIT_AMOUNT);
 
         uint256 feeAmount = DEPOSIT_AMOUNT.mulDivUp(vault.getEntryFee(), vault.getEntryFee() + BASIS_POINT_SCALE);
         uint256 finalDepositAmount = DEPOSIT_AMOUNT.rawSub(feeAmount);
 
-        _addStrategy(allocation);
+        _addStrategy(cap);
 
         vm.prank(curator);
         vault.removeStrategy(address(strategy));
@@ -75,11 +75,11 @@ contract RemoveStrategy__VTS is BaseTestForVTS {
 
     /**
      * @notice Internal helper function to add strategy as curator
-     * @dev Pranks as curator to add strategy with specified allocation
-     * @param allocation Allocation percentage in basis points (10000 = 100%)
+     * @dev Pranks as curator to add strategy with specified cap
+     * @param cap Cap percentage in basis points (10000 = 100%)
      */
-    function _addStrategy(uint256 allocation) internal {
+    function _addStrategy(uint256 cap) internal {
         vm.prank(curator);
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
     }
 }

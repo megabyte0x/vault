@@ -215,69 +215,14 @@ contract AccessControl__VTS is BaseTestForVTS {
      */
 
     /**
-     * @notice Test that curator can set minimum idle assets
-     * @dev Verifies curator role has permission to update minimum idle assets percentage
-     */
-    function test_SetMinimumIdleAssets_AsCurator() public {
-        uint256 newMinimum = 10_00; // 10%
-
-        vm.prank(curator);
-        vault.setMinimumIdleAssets(newMinimum);
-
-        assertEq(vault.getMinimumIdleAssets(), newMinimum);
-    }
-
-    /**
-     * @notice Test that manager cannot set minimum idle assets
-     * @dev Expects revert with AccessControlUnauthorizedAccount error
-     */
-    function test_RevertWhen_SetMinimumIdleAssets_AsManager() public {
-        uint256 newMinimum = 10_00;
-
-        vm.prank(manager);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, manager, CURATOR_ROLE)
-        );
-        vault.setMinimumIdleAssets(newMinimum);
-    }
-
-    /**
-     * @notice Test that allocator cannot set minimum idle assets
-     * @dev Expects revert with AccessControlUnauthorizedAccount error
-     */
-    function test_RevertWhen_SetMinimumIdleAssets_AsAllocator() public {
-        uint256 newMinimum = 10_00;
-
-        vm.prank(allocator);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, allocator, CURATOR_ROLE)
-        );
-        vault.setMinimumIdleAssets(newMinimum);
-    }
-
-    /**
-     * @notice Test that unauthorized user cannot set minimum idle assets
-     * @dev Expects revert with AccessControlUnauthorizedAccount error
-     */
-    function test_RevertWhen_SetMinimumIdleAssets_AsUnauthorizedUser() public {
-        uint256 newMinimum = 10_00;
-
-        vm.prank(unauthorized);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, CURATOR_ROLE)
-        );
-        vault.setMinimumIdleAssets(newMinimum);
-    }
-
-    /**
      * @notice Test that curator can add new strategy
-     * @dev Verifies curator role has permission to add strategies with allocations
+     * @dev Verifies curator role has permission to add strategies with caps
      */
     function test_AddStrategy_AsCurator() public {
-        uint256 allocation = 50_00; // 50%
+        uint256 cap = 50_00; // 50%
 
         vm.prank(curator);
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
 
         assertEq(vault.getStrategyIndex(address(strategy)), 0);
         assertEq(vault.getTotalStrategies(), 1);
@@ -288,13 +233,13 @@ contract AccessControl__VTS is BaseTestForVTS {
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
     function test_RevertWhen_AddStrategy_AsManager() public {
-        uint256 allocation = 50_00;
+        uint256 cap = 50_00;
 
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, manager, CURATOR_ROLE)
         );
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
     }
 
     /**
@@ -302,13 +247,13 @@ contract AccessControl__VTS is BaseTestForVTS {
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
     function test_RevertWhen_AddStrategy_AsAllocator() public {
-        uint256 allocation = 50_00;
+        uint256 cap = 50_00;
 
         vm.prank(allocator);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, allocator, CURATOR_ROLE)
         );
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
     }
 
     /**
@@ -316,13 +261,13 @@ contract AccessControl__VTS is BaseTestForVTS {
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
     function test_RevertWhen_AddStrategy_AsUnauthorizedUser() public {
-        uint256 allocation = 50_00;
+        uint256 cap = 50_00;
 
         vm.prank(unauthorized);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, CURATOR_ROLE)
         );
-        vault.addStrategy(address(strategy), allocation);
+        vault.addStrategy(address(strategy), cap);
     }
 
     /**
@@ -397,80 +342,80 @@ contract AccessControl__VTS is BaseTestForVTS {
      */
 
     /**
-     * @notice Test that allocator can change strategy allocation
-     * @dev Verifies allocator role has permission to modify strategy allocations
+     * @notice Test that allocator can change strategy cap
+     * @dev Verifies allocator role has permission to modify strategy caps
      */
-    function test_ChangeStrategyAllocation_AsAllocator() public {
+    function test_ChangeStrategyCap_AsAllocator() public {
         // First add strategies as curator
         vm.startPrank(curator);
         vault.addStrategy(address(strategy), 50_00);
         vault.addStrategy(address(strategy2), 30_00);
         vm.stopPrank();
 
-        // Change allocation as allocator
-        uint256 newAllocation = 60_00;
+        // Change cap as allocator
+        uint256 newCap = 60_00;
         vm.prank(allocator);
-        vault.changeStrategyAllocation(address(strategy), newAllocation);
+        vault.changeStrategyCap(address(strategy), newCap);
 
-        assertEq(vault.getStrategyDetails(0).allocation, newAllocation);
+        assertEq(vault.getStrategyDetails(0).cap, newCap);
     }
 
     /**
-     * @notice Test that manager cannot change strategy allocation
+     * @notice Test that manager cannot change strategy cap
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
-    function test_RevertWhen_ChangeStrategyAllocation_AsManager() public {
+    function test_RevertWhen_ChangeStrategyCap_AsManager() public {
         // First add a strategy as curator
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
 
-        // Try to change allocation as manager
+        // Try to change cap as manager
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, manager, ALLOCATOR_ROLE)
         );
-        vault.changeStrategyAllocation(address(strategy), 60_00);
+        vault.changeStrategyCap(address(strategy), 60_00);
     }
 
     /**
-     * @notice Test that curator cannot change strategy allocation
+     * @notice Test that curator cannot change strategy cap
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
-    function test_RevertWhen_ChangeStrategyAllocation_AsCurator() public {
+    function test_RevertWhen_ChangeStrategyCap_AsCurator() public {
         // First add a strategy as curator
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
 
-        // Try to change allocation as curator
+        // Try to change cap as curator
         vm.prank(curator);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, curator, ALLOCATOR_ROLE)
         );
-        vault.changeStrategyAllocation(address(strategy), 60_00);
+        vault.changeStrategyCap(address(strategy), 60_00);
     }
 
     /**
-     * @notice Test that unauthorized user cannot change strategy allocation
+     * @notice Test that unauthorized user cannot change strategy cap
      * @dev Expects revert with AccessControlUnauthorizedAccount error
      */
-    function test_RevertWhen_ChangeStrategyAllocation_AsUnauthorizedUser() public {
+    function test_RevertWhen_ChangeStrategyCap_AsUnauthorizedUser() public {
         // First add a strategy as curator
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
 
-        // Try to change allocation as unauthorized user
+        // Try to change cap as unauthorized user
         vm.prank(unauthorized);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, ALLOCATOR_ROLE
             )
         );
-        vault.changeStrategyAllocation(address(strategy), 60_00);
+        vault.changeStrategyCap(address(strategy), 60_00);
     }
 
     /**
      * @notice Test that allocator can reallocate funds
-     * @dev Verifies allocator can trigger fund reallocation after deposits
+     * @dev Verifies allocator can trigger fund recap after deposits
      */
     function test_ReallocateFunds_AsAllocator() public {
         // Setup: deposit funds and add strategy
@@ -479,9 +424,11 @@ contract AccessControl__VTS is BaseTestForVTS {
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
 
+        uint256[] memory newAllocations = new uint256[](0);
+
         // Reallocate as allocator
         vm.prank(allocator);
-        vault.reallocateFunds();
+        vault.reallocateFunds(newAllocations);
 
         // Verify funds were reallocated (no revert means success)
         assertTrue(vault.getAssetInStrategy(address(strategy)) > 0);
@@ -497,13 +444,14 @@ contract AccessControl__VTS is BaseTestForVTS {
 
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
+        uint256[] memory newAllocations = new uint256[](0);
 
         // Try to reallocate as manager
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, manager, ALLOCATOR_ROLE)
         );
-        vault.reallocateFunds();
+        vault.reallocateFunds(newAllocations);
     }
 
     /**
@@ -516,13 +464,14 @@ contract AccessControl__VTS is BaseTestForVTS {
 
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
+        uint256[] memory newAllocations = new uint256[](0);
 
         // Try to reallocate as curator
         vm.prank(curator);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, curator, ALLOCATOR_ROLE)
         );
-        vault.reallocateFunds();
+        vault.reallocateFunds(newAllocations);
     }
 
     /**
@@ -543,7 +492,8 @@ contract AccessControl__VTS is BaseTestForVTS {
                 IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, ALLOCATOR_ROLE
             )
         );
-        vault.reallocateFunds();
+        uint256[] memory newAllocations = new uint256[](0);
+        vault.reallocateFunds(newAllocations);
     }
 
     /*
@@ -647,8 +597,9 @@ contract AccessControl__VTS is BaseTestForVTS {
         // Allocator function (need to deposit first)
         vm.stopPrank();
         _deposit(DEPOSIT_AMOUNT);
+        uint256[] memory newAllocations = new uint256[](0);
         vm.prank(multiRole);
-        vault.reallocateFunds();
+        vault.reallocateFunds(newAllocations);
 
         assertTrue(vault.getAssetInStrategy(address(strategy)) > 0);
     }

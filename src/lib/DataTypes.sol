@@ -5,13 +5,11 @@ library DataTypes {
     struct Strategy {
         /// @notice Address of the Tokenized Strategy Vault.
         address strategy;
-        /// @notice Percentage of total assets to be allocated to this strategy, expressed in basis points.
-        uint256 allocation;
+        /// @notice Maximum number of `assets` that can be deposited in this `Strategy`.
+        uint256 cap;
     }
 
     struct StrategyState {
-        /// @notice Percentage of minimum Idle assets needs to be present in the vault at all times, expressed in basis points.
-        uint256 minimumIdleAssets;
         /// @notice Total number of strategies currently vault is working with.
         uint256 totalStrategies;
         /// @notice Mapping from index to the strategy
@@ -19,6 +17,10 @@ library DataTypes {
         /// @notice Mapping from Strategy address to its index.
         /// @dev 0 means not present, otherwise index + 1.
         mapping(address strategy => uint256 indexPlusOne) strategyToIndex;
+
+        uint256[] withdrawQueue;
+
+        uint256[] supplyQueue;
     }
 
     struct VaultState {
