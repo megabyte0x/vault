@@ -5,6 +5,7 @@ import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {AccessControl} from "@openzeppelin/access/AccessControl.sol";
+import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
 
 import {DataTypes} from "./lib/DataTypes.sol";
 import {Errors} from "./lib/Errors.sol";
@@ -20,7 +21,7 @@ import {SimpleVTS__Storage} from "./SimpleVTS__Storage.sol";
 /// @author megabyte0x.eth
 
 // aderyn-ignore-next-line(centralization-risk)
-contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
+contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuard {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for address;
     using TokenizedStrategyLogic for DataTypes.StrategyState;
@@ -28,10 +29,14 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
     using StrategyStateLogic for DataTypes.StrategyState;
     using VaultStateLogic for DataTypes.VaultState;
 
-    /// @notice Initializes the vault with the specified underlying asset
-    /// @param asset_ The address of the ERC20 token to be used as the underlying asset
-    constructor(address asset_) SimpleVTS__Storage(asset_) {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    /**
+     * @notice Initializes the vault with the specified underlying asset
+     * @param _asset The address of the ERC20 token to be used as the underlying asset
+     * @param _admin The address which will act as the MAIN ADMIN of the vault.
+     */
+    constructor(address _asset, address _admin) SimpleVTS__Storage(_asset) {
+        if (_admin == address(0)) revert Errors.ZeroAddress();
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     }
 
     /*
@@ -83,7 +88,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
         s_strategy.validateStrategyRemoval(strategy);
 
         //! TODO: This needs to be timelocked
-        TokenizedStrategyLogic.withdrawMaxFunds(strategy);
+        TokenizedStrategyLogic.withdrawMaxFunds(strategy, i_asset);
         s_strategy.removeStrategy(strategy);
 
         emit SimpleVTS__TokenizedStrategyRemoved(strategy);
@@ -100,7 +105,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
         emit SimpleVTS__CapUpdated(strategy, newCap);
     }
 
-    function reallocateFunds(uint256[] calldata allocations) external onlyRole(ALLOCATOR) {
+    function reallocateFunds(DataTypes.Allocation[] calldata allocations) external onlyRole(ALLOCATOR) {
         s_strategy.validateReallocateFunds(totalAssets(), i_asset);
 
         s_strategy.reallocateFunds(allocations);
@@ -193,14 +198,40 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
         for (i; i < s_strategy.totalStrategies; i++) {
             assets = assets.rawAdd(TokenizedStrategyLogic.getAssetBalanceInStrategy(s_strategy.strategies[i].strategy));
         }
-
-        assets = assets.rawAdd(ERC20(i_asset).balanceOf(address(this)));
     }
 
+    /**
+     * @notice Returns max amount of assets any `user` can deposit.
+     * @dev It returns the sum of remaining `cap` of each `strategy`.
+     * @param user Address of the user
+     */
+    function maxDeposit(address user) public view override returns (uint256 maxAssets) {
+        uint256 i = 0;
+        uint256[] memory supplyQueue = s_strategy.supplyQueue;
+        for (i; i < supplyQueue.length; i++) {
+            DataTypes.Strategy memory strategy = s_strategy.strategies[supplyQueue[i]];
+
+            uint256 cap = strategy.cap;
+
+            if (cap == 0) continue;
+
+            uint256 currentBalance = TokenizedStrategyLogic.getAssetBalanceInStrategy(strategy.strategy);
+
+            maxAssets = maxAssets.rawAdd(currentBalance);
+        }
+    }
+
+    /**
+     * @notice Returns max amount of assets `user` can withdraw after applicable `fee`.
+     * @param user Address of the user
+     */
     function maxWithdraw(address user) public view override returns (uint256 maxAssets) {
         uint256 balanceOfUser = convertToAssets(balanceOf(user));
+        uint256 fee = getExitFee();
 
-        uint256 feeOnWithdraw = _feeOnTotal(balanceOfUser, getExitFee());
+        if (fee == 0) return balanceOfUser;
+
+        uint256 feeOnWithdraw = _feeOnTotal(balanceOfUser, fee);
 
         maxAssets = balanceOfUser.rawSub(feeOnWithdraw);
     }
@@ -247,28 +278,45 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl {
       |___|_| |_|\__\___|_|  |_| |_|\__,_|_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
     */
 
+    /**
+     * @notice Deposit the supplied funds, after applicable `fee`, in the strategies.
+     * @param assets Amount of base `asset`
+     * @param shares Amount of shares.
+     */
     function _afterDeposit(uint256 assets, uint256 shares) internal override {
-        uint256 fee = _feeOnTotal(assets, getEntryFee());
+        uint256 fee = getEntryFee();
 
-        // Transfer entry fee to fee recipient (if fee exists and recipient is not this contract)
-        if (fee > 0 && s_vault.feeRecipient != address(this)) {
-            i_asset.safeTransfer(s_vault.feeRecipient, fee);
+        if (fee != 0) {
+            uint256 feeAmount = _feeOnTotal(assets, fee);
+
+            // Transfer entry fee to fee recipient (if fee exists and recipient is not this contract)
+            if (feeAmount > 0 && s_vault.feeRecipient != address(this)) {
+                i_asset.safeTransfer(s_vault.feeRecipient, feeAmount);
+            }
+
+            assets = assets.rawSub(feeAmount);
         }
-
-        assets = assets.rawSub(fee);
 
         s_strategy.depositFunds(assets);
     }
 
-    function _beforeWithdraw(uint256 assets, uint256 shares) internal override {
+    /**
+     * @notice Withdraw funds from the strategies, and deduct applicable `fee`.
+     * @param assets Amount of base `asset`
+     * @param shares Amount of shares.
+     */
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal override nonReentrant {
         // Withdraw assets from strategies
         s_strategy.withdrawFunds(assets);
 
-        uint256 fee = _feeOnRaw(assets, getExitFee());
+        uint256 fee = getExitFee();
+        if (fee != 0) {
+            uint256 feeAmount = _feeOnRaw(assets, fee);
 
-        // Transfer exit fee to fee recipient (if fee exists and recipient is not this contract)
-        if (fee > 0 && s_vault.feeRecipient != address(this)) {
-            i_asset.safeTransfer(s_vault.feeRecipient, fee);
+            // Transfer exit fee to fee recipient (if fee exists and recipient is not this contract)
+            if (feeAmount > 0 && s_vault.feeRecipient != address(this)) {
+                i_asset.safeTransfer(s_vault.feeRecipient, feeAmount);
+            }
         }
     }
 

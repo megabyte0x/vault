@@ -36,8 +36,9 @@ library TokenizedStrategyLogic {
 
     function depositFunds(DataTypes.StrategyState storage s, uint256 assets) internal {
         uint256 i = 0;
-        for (i; i < s.supplyQueue.length; ++i) {
-            DataTypes.Strategy memory strategy = s.strategies[i];
+        uint256[] memory supplyQueue = s.supplyQueue;
+        for (i; i < supplyQueue.length; ++i) {
+            DataTypes.Strategy memory strategy = s.strategies[supplyQueue[i]];
 
             if (strategy.cap == 0) continue;
 
@@ -67,8 +68,9 @@ library TokenizedStrategyLogic {
      */
     function withdrawFunds(DataTypes.StrategyState storage s, uint256 assets) internal {
         uint256 i = 0;
-        for (i; i < s.withdrawQueue.length; i++) {
-            DataTypes.Strategy memory strategy = s.strategies[i];
+        uint256[] memory withdrawQueue = s.withdrawQueue;
+        for (i; i < withdrawQueue.length; i++) {
+            DataTypes.Strategy memory strategy = s.strategies[withdrawQueue[i]];
 
             uint256 maxWithdrawable = getMaxWithdrawable(strategy.strategy);
 
@@ -86,16 +88,17 @@ library TokenizedStrategyLogic {
         if (assets != 0) revert Errors.NotEnoughLiquidity();
     }
 
-    function reallocateFunds(DataTypes.StrategyState storage s, uint256[] memory allocations) internal {
+    function reallocateFunds(DataTypes.StrategyState storage s, DataTypes.Allocation[] memory allocations) internal {
         uint256 totalSupplied;
         uint256 totalWithdrawn;
 
         uint256 i = 0;
         for (i; i < allocations.length; i++) {
-            DataTypes.Strategy memory strategy = s.strategies[i];
+            DataTypes.Allocation memory allocation = allocations[i];
+            DataTypes.Strategy memory strategy = s.strategies[allocation.index];
 
             uint256 currentBalance = getAssetBalanceInStrategy(strategy.strategy);
-            uint256 newAllocation = allocations[i];
+            uint256 newAllocation = allocation.amount;
 
             /// @dev If `newAllocation` is less than `currentBalance`, it means we need withdraw funds.
             uint256 toWithdraw = currentBalance.zeroFloorSub(newAllocation);
@@ -139,16 +142,20 @@ library TokenizedStrategyLogic {
         SimpleTokenizedStrategy(strategy).deposit(amountToSupply, address(this));
     }
 
-    function withdrawMaxFunds(address strategy) internal {
+    function withdrawMaxFunds(address strategy, address asset) internal {
         uint256 maxWithdrawable = getMaxWithdrawable(strategy);
 
         SimpleTokenizedStrategy(strategy).withdraw(maxWithdrawable, address(this), address(this));
+
+        strategy.safeApprove(asset, 0);
     }
 
     function emergencyWithdraw(DataTypes.StrategyState storage s) internal {
         uint256 i = 0;
-        for (i; i < s.totalStrategies; i++) {
-            uint256 maxWithdrawable = SimpleTokenizedStrategy(s.strategies[i].strategy).maxWithdraw(address(this));
+        uint256[] memory withdrawQueue = s.withdrawQueue;
+        for (i; i < withdrawQueue.length; i++) {
+            uint256 maxWithdrawable =
+                SimpleTokenizedStrategy(s.strategies[withdrawQueue[i]].strategy).maxWithdraw(address(this));
 
             if (maxWithdrawable == 0) continue;
 

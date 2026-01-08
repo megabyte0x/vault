@@ -2,6 +2,11 @@
 pragma solidity 0.8.30;
 
 library DataTypes {
+    struct Allocation {
+        uint256 index;
+        uint256 amount;
+    }
+
     struct Strategy {
         /// @notice Address of the Tokenized Strategy Vault.
         address strategy;

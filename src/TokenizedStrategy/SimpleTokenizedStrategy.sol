@@ -18,7 +18,7 @@ abstract contract SimpleTokenizedStrategy is ERC4626 {
     /// @notice The vault contract that owns this strategy
     address public immutable i_vault;
 
-    address public immutable i_asset;
+    address private immutable i_asset;
 
     constructor(address yieldSource_, address vault_) {
         i_yieldSource = yieldSource_;

@@ -28,18 +28,14 @@ contract AaveTokenizedStrategy is SimpleTokenizedStrategy {
         assets = _getBalanceInAave();
     }
 
-    function _deposit(address by, address to, uint256 assets, uint256 shares) internal override {
-        super._deposit(by, to, assets, shares);
-
+    function _afterDeposit(uint256 assets, uint256 shares) internal override {
         // Supply to Aave
         asset().safeApprove(i_yieldSource, assets);
         IAave(i_yieldSource).supply(asset(), assets, address(this), REFERRAL_CODE);
     }
 
-    function _withdraw(address by, address to, address owner, uint256 assets, uint256 shares) internal override {
-        super._withdraw(by, to, owner, assets, shares);
-
-        IAave(i_yieldSource).withdraw(asset(), assets, i_vault);
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal override {
+        IAave(i_yieldSource).withdraw(asset(), assets, address(this));
     }
 
     /// @notice Gets the balance of assets deposited in Aave

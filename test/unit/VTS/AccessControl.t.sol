@@ -7,6 +7,7 @@ import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
 import {Errors} from "../../../src/lib/Errors.sol";
 import {MockTokenizedStrategy, BaseTestForVTS} from "../../BaseTestForVTS.t.sol";
+import {DataTypes} from "../../../src/lib/DataTypes.sol";
 
 /**
  * @title AccessControl Test Suite for SimpleVaultWithTokenizedStrategy
@@ -424,7 +425,7 @@ contract AccessControl__VTS is BaseTestForVTS {
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
 
-        uint256[] memory newAllocations = new uint256[](0);
+        DataTypes.Allocation[] memory newAllocations = new DataTypes.Allocation[](0);
 
         // Reallocate as allocator
         vm.prank(allocator);
@@ -444,7 +445,8 @@ contract AccessControl__VTS is BaseTestForVTS {
 
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
-        uint256[] memory newAllocations = new uint256[](0);
+
+        DataTypes.Allocation[] memory newAllocations = new DataTypes.Allocation[](0);
 
         // Try to reallocate as manager
         vm.prank(manager);
@@ -464,7 +466,8 @@ contract AccessControl__VTS is BaseTestForVTS {
 
         vm.prank(curator);
         vault.addStrategy(address(strategy), 50_00);
-        uint256[] memory newAllocations = new uint256[](0);
+
+        DataTypes.Allocation[] memory newAllocations = new DataTypes.Allocation[](0);
 
         // Try to reallocate as curator
         vm.prank(curator);
@@ -492,7 +495,8 @@ contract AccessControl__VTS is BaseTestForVTS {
                 IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, ALLOCATOR_ROLE
             )
         );
-        uint256[] memory newAllocations = new uint256[](0);
+
+        DataTypes.Allocation[] memory newAllocations = new DataTypes.Allocation[](0);
         vault.reallocateFunds(newAllocations);
     }
 
@@ -597,7 +601,8 @@ contract AccessControl__VTS is BaseTestForVTS {
         // Allocator function (need to deposit first)
         vm.stopPrank();
         _deposit(DEPOSIT_AMOUNT);
-        uint256[] memory newAllocations = new uint256[](0);
+
+        DataTypes.Allocation[] memory newAllocations = new DataTypes.Allocation[](0);
         vm.prank(multiRole);
         vault.reallocateFunds(newAllocations);
 
