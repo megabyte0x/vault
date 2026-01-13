@@ -76,12 +76,18 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         emit Events.SimpleVTS__FeeRecipientUpdated(newFeeRecipient);
     }
 
+    function setMaxStrategies(uint256 newMaxStrategies) external onlyRole(MANAGER) {
+        s_vault.maxStrategies = newMaxStrategies;
+
+        emit Events.SimpleVTS__MaxStrategiesUpdated(newMaxStrategies);
+    }
+
     /// @notice Adds a new tokenized strategy to the vault
     /// @dev Only callable by CURATOR role. Strategy must be compatible with vault asset
     /// @param strategy The address of the tokenized strategy contract to add
     /// @param cap The maximum amount of assets this strategy can hold
     function addStrategy(address strategy, uint256 cap) external onlyRole(CURATOR) {
-        s_strategy.validateStrategyAddition(strategy, i_asset, MAX_STRATEGIES);
+        s_strategy.validateStrategyAddition(strategy, i_asset, s_vault.maxStrategies);
 
         s_strategy.addStrategy(strategy, cap);
 
@@ -125,7 +131,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
     /// @dev Only callable by ALLOCATOR role. Queue determines priority for fund deployment
     /// @param newSupplyQueue Array of strategy indices in desired supply order
     function updateSupplyQueue(uint256[] memory newSupplyQueue) external onlyRole(ALLOCATOR) {
-        s_strategy.validateNewSupplyQueue(newSupplyQueue, MAX_STRATEGIES);
+        s_strategy.validateNewSupplyQueue(newSupplyQueue, s_vault.maxStrategies);
 
         s_strategy.updateSupplyQueue(newSupplyQueue);
 
@@ -285,6 +291,10 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         return s_vault.feeRecipient;
     }
 
+    function getMaxStrategies() external view returns (uint256) {
+        return s_vault.maxStrategies;
+    }
+
     /// @notice Returns detailed information about a strategy
     /// @param strategyIndex The index of the strategy in the strategies array
     /// @return strategy The strategy struct containing address and allocation cap
@@ -305,6 +315,22 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         assets = TokenizedStrategyLogic.getAssetBalanceInStrategy(
             s_strategy.strategies[s_strategy.getStrategyIndex(strategy)].strategy
         );
+    }
+
+    function getSupplyQueue() external view returns (uint256[] memory supplyQueue) {
+        supplyQueue = s_strategy.supplyQueue;
+    }
+
+    function getWithdrawQueue() external view returns (uint256[] memory withdrawQueue) {
+        withdrawQueue = s_strategy.withdrawQueue;
+    }
+
+    function getSupplyQueueLength() external view returns (uint256) {
+        return s_strategy.supplyQueue.length;
+    }
+
+    function getWithdrawQueueLength() external view returns (uint256) {
+        return s_strategy.withdrawQueue.length;
     }
 
     /*

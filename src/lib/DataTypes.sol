@@ -51,5 +51,8 @@ library DataTypes {
         uint256 exitFee;
         /// @notice Address that receives collected entry and exit fees
         address feeRecipient;
+
+        /// @notice Maximum number of strategies that can be added to the vault
+        uint256 maxStrategies;
     }
 }

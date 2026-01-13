@@ -15,10 +15,6 @@ contract SimpleVTS__Storage {
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 internal constant BASIS_POINT_SCALE = 1e4;
 
-    /// @notice Maximum number of strategies that can be added to the vault
-    //! TODO: Consider making this configurable rather than hardcoded
-    uint256 internal constant MAX_STRATEGIES = 10;
-
     /// @notice Role identifier for users who can reallocate funds and manage strategy queues
     bytes32 public constant ALLOCATOR = keccak256("ALLOCATOR");
 

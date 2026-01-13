@@ -55,6 +55,20 @@ contract BaseTestForVTS is Test {
     /// @notice Small test amount for edge cases (100 USDC)
     uint256 public constant SMALL_TEST_AMOUNT = 100e6;
 
+    uint256 public constant INITIAL_DEPOSIT_AMOUNT = 347933e6;
+
+    /// @notice Standard strategy cap for tests (200,000 USDC - 2x DEPOSIT_AMOUNT)
+    uint256 public constant STANDARD_STRATEGY_CAP = DEPOSIT_AMOUNT * 2;
+
+    /// @notice Large strategy cap for tests (300,000 USDC - 3x DEPOSIT_AMOUNT)
+    uint256 public constant LARGE_STRATEGY_CAP = DEPOSIT_AMOUNT * 3;
+
+    /// @notice Very large cap for edge case testing (1 billion USDC)
+    uint256 public constant VERY_LARGE_CAP = 1_000_000_000e6;
+
+    /// @notice Small strategy cap for multiple strategy tests (50,000 USDC)
+    uint256 public constant SMALL_STRATEGY_CAP = DEPOSIT_AMOUNT / 2;
+
     bytes32 public constant ALLOCATOR_ROLE = keccak256("ALLOCATOR");
     bytes32 public constant CURATOR_ROLE = keccak256("CURATOR");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER");
@@ -85,9 +99,9 @@ contract BaseTestForVTS is Test {
 
         _setFeeConfig();
 
-        // Transfer USDC from whale to test user
-        vm.prank(networkConfig.usdc_holder);
-        (networkConfig.usdc).safeTransfer(user, USDC_TO_MINT);
+        _transferUSDC();
+
+        _setMaxStrategies();
     }
 
     function _setRoles() internal {
@@ -105,5 +119,17 @@ contract BaseTestForVTS is Test {
         vault.setExitFee(networkConfig.exitFee);
         vault.setFeeRecipient(feeRecipient);
         vm.stopPrank();
+    }
+
+    function _transferUSDC() internal {
+        vm.startPrank(networkConfig.usdc_holder);
+        (networkConfig.usdc).safeTransfer(user, USDC_TO_MINT);
+        (networkConfig.usdc).safeTransfer(address(this), USDC_TO_MINT);
+        vm.stopPrank();
+    }
+
+    function _setMaxStrategies() internal {
+        vm.prank(manager);
+        vault.setMaxStrategies(10);
     }
 }

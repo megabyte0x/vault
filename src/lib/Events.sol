@@ -63,4 +63,6 @@ library Events {
     /// @param strategyIndex The index of the strategy funds were deposited into
     /// @param amountDeposited The amount of assets deposited
     event SimpleVTS__DepositedInStrategy(uint256 strategyIndex, uint256 amountDeposited);
+
+    event SimpleVTS__MaxStrategiesUpdated(uint256 newMaxStrategies);
 }
