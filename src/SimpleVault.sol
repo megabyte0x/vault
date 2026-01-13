@@ -191,6 +191,11 @@ contract SimpleVault is ERC4626 {
         assets = s_strategy.totalAssets();
     }
 
+    /// @notice Returns the maximum amount of assets that can be withdrawn by a user
+    /// @inheritdoc ERC4626
+    /// @dev Calculates withdrawable amount after deducting exit fees
+    /// @param user The address of the user
+    /// @return maxAssets The maximum amount of assets that can be withdrawn (after fees)
     function maxWithdraw(address user) public view override returns (uint256 maxAssets) {
         uint256 balanceOfUser = convertToAssets(balanceOf(user));
 
@@ -211,10 +216,14 @@ contract SimpleVault is ERC4626 {
         return s_exitFee;
     }
 
+    /// @notice Returns the current fee recipient address
+    /// @return The address that receives collected fees
     function getFeeRecipient() external view returns (address) {
         return s_feeRecipient;
     }
 
+    /// @notice Returns the current strategy contract address
+    /// @return The address of the strategy contract managing yield generation
     function getStrategy() external view returns (address) {
         return address(s_strategy);
     }
@@ -281,14 +290,20 @@ contract SimpleVault is ERC4626 {
         super._withdraw(by, to, owner, assetsToTransfer, shares);
     }
 
-    /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
-    /// Used in {ERC4626-mint} and {ERC4626-withdraw} operations.
+    /// @notice Calculates the fees that should be added to an amount that does not already include fees
+    /// @dev Used in {ERC4626-mint} and {ERC4626-withdraw} operations
+    /// @param assets The base amount of assets (without fees)
+    /// @param feeBasisPoints The fee rate in basis points
+    /// @return The calculated fee amount
     function _feeOnRaw(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
         return assets.mulDivUp(feeBasisPoints, BASIS_POINT_SCALE);
     }
 
-    /// @dev Calculates the fee part of an amount `assets` that already includes fees.
-    /// Used in {ERC4626-deposit} and {ERC4626-redeem} operations.
+    /// @notice Calculates the fee portion of an amount that already includes fees
+    /// @dev Used in {ERC4626-deposit} and {ERC4626-redeem} operations
+    /// @param assets The total amount of assets (including fees)
+    /// @param feeBasisPoints The fee rate in basis points
+    /// @return The calculated fee amount
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
         return assets.mulDivUp(feeBasisPoints, feeBasisPoints + BASIS_POINT_SCALE);
     }

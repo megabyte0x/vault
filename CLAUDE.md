@@ -85,13 +85,14 @@ make clean
 - Integrates with SimpleStrategy for yield generation
 - Handles fee distribution to designated recipient
 
-**SimpleVaultWithTokenizedStrategy** (`src/SimpleVaultWithTokenizedStrategy.sol`):
-- Advanced ERC-4626 vault with modular tokenized strategy support
+**SimpleVTS** (`src/SimpleVTS.sol`):
+- Advanced ERC-4626 vault with modular tokenized strategy support (previously SimpleVaultWithTokenizedStrategy)
 - Supports multiple strategies with configurable allocations
 - Uses library-based architecture for gas optimization and modularity
-- Implements AccessControl for role-based permissions (MANAGER role)
+- Implements AccessControl with multiple roles (MANAGER, CURATOR, ALLOCATOR)
+- Includes ReentrancyGuard for secure operations
 - Maintains minimum idle asset ratios for liquidity management
-- Storage contract: `SimpleVaultWithTokenizedStrategyStorage.sol`
+- Storage contract: `SimpleVTS__Storage.sol`
 
 **SimpleStrategy** (`src/SimpleStrategy.sol`):
 - Single-strategy implementation splitting 80% of deposits equally between:
@@ -103,7 +104,7 @@ make clean
 - `SimpleTokenizedStrategy.sol`: Base tokenized strategy implementation
 - `AaveTokenizedStrategy.sol`: Aave-specific tokenized strategy
 
-### Library Architecture (SimpleVaultWithTokenizedStrategy)
+### Library Architecture (SimpleVTS)
 
 The tokenized strategy vault uses a modular library-based design in `src/lib/`:
 
@@ -119,6 +120,7 @@ The tokenized strategy vault uses a modular library-based design in `src/lib/`:
 - `Helpers.sol`: Utility functions for validation and calculations
 
 **Error Handling**: `Errors.sol` - Centralized custom error definitions
+**Event Handling**: `Events.sol` - Centralized event definitions for strategy operations
 
 ### Dependencies and Imports
 
@@ -142,14 +144,21 @@ Tests use Foundry's testing framework with mainnet forking:
 **Test Structure**:
 - `test/unit/`: Unit tests for individual contracts
   - `SimpleVault.t.sol`: Tests for basic vault functionality
-  - `SimpleVaultWithTokenizedStrategy.t.sol`: Tests for advanced vault
+  - `VTS.t.sol`: Tests for SimpleVTS (tokenized strategy vault)
+  - `VTS/`: Specialized VTS tests
+    - `AccessControl.t.sol`: Access control and role management tests
+    - `AddStrategy.t.sol`: Strategy addition and management tests
   - `SimpleStrategy.t.sol`: Tests for strategy implementation
 - `test/fuzz/`: Fuzz testing for edge cases
   - `SimpleVault.t.sol`: Fuzz tests for vault operations
+- `test/harness/`: Test harnesses for internal function testing
+  - `SimpleVTSHarness.sol`: Harness for SimpleVTS internal functions
+  - `SimpleVaultHarness.sol`: Harness for SimpleVault internal functions
 - `test/BaseTest.t.sol`: Base test contract for SimpleVault
 - `test/BaseTestForVTS.t.sol`: Base test contract for tokenized strategy vault
 - Mock contracts in `test/mock/`:
   - `MockTokenizedStrategy.sol`: Mock strategy for testing
+  - `MockUSDC.sol`: Mock USDC token for testing
   - `MockYieldSource.sol`: Mock yield source for testing
 
 **Fork Configuration**:
@@ -183,10 +192,22 @@ Required environment variables in `.env` file:
 The project follows a modular architecture:
 
 **SimpleVault**: Direct strategy integration pattern for simple use cases
-**SimpleVaultWithTokenizedStrategy**: Library-based modular pattern supporting:
+**SimpleVTS**: Library-based modular pattern supporting:
 - Multiple tokenized strategies with dynamic allocations
 - Gas-optimized operations through library delegation
-- Role-based access control with MANAGER permissions
+- Role-based access control with multiple roles (MANAGER, CURATOR, ALLOCATOR)
+- Reentrancy protection for secure operations
+- Supply and withdraw queue management for optimal strategy allocation
 - Minimum idle asset management for liquidity requirements
 
 Both architectures allow pluggable strategy contracts for future protocol integrations while maintaining ERC-4626 compliance.
+
+## Security Considerations
+
+The project includes security auditing documentation (`basic_audit.md`) that highlights critical areas requiring attention:
+- Access control validation for all role-based functions
+- Array bounds checking in queue management
+- Reentrancy protection on deposit/withdraw operations
+- Integer overflow/underflow protection in calculations
+
+Developers should review audit findings before making changes to critical functions.

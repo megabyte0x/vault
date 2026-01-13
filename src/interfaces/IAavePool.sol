@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// src/contracts/protocol/libraries/types/DataTypes.sol
+/// @title IAavePool
+/// @notice Interface for Aave Pool contract with data types and function signatures
+/// @dev This is the official Aave v3 Pool interface used for lending and borrowing operations
+/// @dev Source: Aave v3 Core Protocol - src/contracts/protocol/libraries/types/DataTypes.sol and src/contracts/interfaces/IPool.sol
 
 library DataTypes {
     /**

@@ -4,55 +4,38 @@ pragma solidity 0.8.30;
 import {DataTypes} from "./lib/DataTypes.sol";
 import {Errors} from "./lib/Errors.sol";
 
+/// @title SimpleVTS__Storage
+/// @notice Storage contract for SimpleVTS vault containing state variables and access control roles
+/// @dev Separated storage contract pattern for upgradeable design and gas optimization
+/// @author megabyte0x.eth
 contract SimpleVTS__Storage {
-    /**
-     * @notice Emitted when the entry fee is updated
-     * @param newEntryFee The new entry fee in basis points
-     */
-    event SimpleVTS__EntryFeeUpdated(uint256 indexed newEntryFee);
-
-    /// @notice Emitted when the exit fee is updated
-    /// @param newExitFee The new exit fee in basis points
-    event SimpleVTS__ExitFeeUpdated(uint256 indexed newExitFee);
-
-    /// @notice Emitted when the fee recipient address is updated
-    /// @param newFeeRecipient The new address that will receive fees
-    event SimpleVTS__FeeRecipientUpdated(address indexed newFeeRecipient);
-
-    /// @notice Emitted when the strategy contract is updated
-    /// @param newStrategy The new strategy contract address
-    event SimpleVTS__StrategyUpdated(address indexed newStrategy);
-
-    event SimpleVTS__TokenizedStrategyAdded(address indexed strategy, uint256 indexed cap);
-
-    event SimpleVTS__TokenizedStrategyRemoved(address indexed strategy);
-
-    event SimpleVTS__CapUpdated(address indexed strategy, uint256 indexed newCap);
-
-    event SimpleVTS__FundsReallocated();
-
-    event SimpleVTS__MinimumIdleAssetsUpdated(uint256 indexed newMinimumIdleAssets);
-
-    event SimpleVTS__EmergencyWithdrawFunds();
-
     /// @notice The underlying asset that the vault accepts (immutable)
     address internal immutable i_asset;
 
     /// @notice Scale factor for basis points calculations (10,000 = 100%)
     uint256 internal constant BASIS_POINT_SCALE = 1e4;
 
-    /// @notice Max number of strategies.
+    /// @notice Maximum number of strategies that can be added to the vault
+    //! TODO: Consider making this configurable rather than hardcoded
     uint256 internal constant MAX_STRATEGIES = 10;
 
+    /// @notice Role identifier for users who can reallocate funds and manage strategy queues
     bytes32 public constant ALLOCATOR = keccak256("ALLOCATOR");
+
+    /// @notice Role identifier for users who can add new strategies to the vault
     bytes32 public constant CURATOR = keccak256("CURATOR");
+
+    /// @notice Role identifier for users with full management privileges including emergency functions
     bytes32 public constant MANAGER = keccak256("MANAGER");
 
+    /// @notice Vault configuration state including fees and recipient
     DataTypes.VaultState internal s_vault;
 
-    /// @notice State of the strategies.
+    /// @notice Complete strategy management state including strategies array and queues
     DataTypes.StrategyState internal s_strategy;
 
+    /// @notice Initializes the storage contract with the underlying asset
+    /// @param asset_ The address of the ERC20 token to be used as the underlying asset
     constructor(address asset_) {
         if (asset_ == address(0)) revert Errors.ZeroAddress();
         i_asset = asset_;

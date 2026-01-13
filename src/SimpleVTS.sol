@@ -2,22 +2,25 @@
 pragma solidity 0.8.30;
 
 import {ERC4626, ERC20} from "@solady/tokens/ERC4626.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
-import {AccessControl} from "@openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
+import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {AccessControl} from "@openzeppelin/access/AccessControl.sol";
 
-import {DataTypes} from "./lib/DataTypes.sol";
 import {Errors} from "./lib/Errors.sol";
+import {Events} from "./lib/Events.sol";
 import {Helpers} from "./lib/Helpers.sol";
-import {StrategyStateLogic} from "./lib/StrategyStateLogic.sol";
+import {DataTypes} from "./lib/DataTypes.sol";
 import {VaultStateLogic} from "./lib/VaultStateLogic.sol";
+import {StrategyStateLogic} from "./lib/StrategyStateLogic.sol";
 import {TokenizedStrategyLogic} from "./lib/TokenizedStrategyLogic.sol";
+
 import {SimpleVTS__Storage} from "./SimpleVTS__Storage.sol";
 
-/// @title SimpleVault
-/// @notice An ERC-4626 compliant vault that integrates with DeFi protocols through a pluggable strategy
-/// @dev Extends Solady's ERC4626 implementation with entry/exit fees and strategy delegation
+/// @title SimpleVTS (Simple Vault with Tokenized Strategies)
+/// @notice Advanced ERC-4626 compliant vault with modular tokenized strategy support
+/// @dev Extends Solady's ERC4626 with role-based access control, multiple strategies, and advanced allocation management
+/// @custom:security Uses reentrancy guards and access control for secure operations
 /// @author megabyte0x.eth
 
 // aderyn-ignore-next-line(centralization-risk)
@@ -52,7 +55,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
     function setEntryFee(uint256 newEntryFee) external onlyRole(MANAGER) {
         s_vault.updateEntryFee(newEntryFee);
 
-        emit SimpleVTS__EntryFeeUpdated(newEntryFee);
+        emit Events.SimpleVTS__EntryFeeUpdated(newEntryFee);
     }
 
     /// @notice Sets the exit fee for withdrawals
@@ -60,7 +63,7 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
     function setExitFee(uint256 newExitFee) external onlyRole(MANAGER) {
         s_vault.updateExitFee(newExitFee);
 
-        emit SimpleVTS__ExitFeeUpdated(newExitFee);
+        emit Events.SimpleVTS__ExitFeeUpdated(newExitFee);
     }
 
     /// @notice Sets the address that will receive collected fees
@@ -70,53 +73,74 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
 
         s_vault.updateFeeRecipient(newFeeRecipient);
 
-        emit SimpleVTS__FeeRecipientUpdated(newFeeRecipient);
+        emit Events.SimpleVTS__FeeRecipientUpdated(newFeeRecipient);
     }
 
+    /// @notice Adds a new tokenized strategy to the vault
+    /// @dev Only callable by CURATOR role. Strategy must be compatible with vault asset
+    /// @param strategy The address of the tokenized strategy contract to add
+    /// @param cap The maximum amount of assets this strategy can hold
     function addStrategy(address strategy, uint256 cap) external onlyRole(CURATOR) {
         s_strategy.validateStrategyAddition(strategy, i_asset, MAX_STRATEGIES);
 
-        //! TODO: This needs to be timelocked
         s_strategy.addStrategy(strategy, cap);
 
         i_asset.safeApprove(strategy, type(uint256).max);
 
-        emit SimpleVTS__TokenizedStrategyAdded(strategy, cap);
+        emit Events.SimpleVTS__TokenizedStrategyAdded(strategy, cap);
     }
 
-    function removeStrategy(address strategy) external onlyRole(CURATOR) {
-        s_strategy.validateStrategyRemoval(strategy);
-
-        //! TODO: This needs to be timelocked
-        TokenizedStrategyLogic.withdrawMaxFunds(strategy, i_asset);
-        s_strategy.removeStrategy(strategy);
-
-        emit SimpleVTS__TokenizedStrategyRemoved(strategy);
-    }
-
+    /// @notice Changes the asset allocation cap for an existing strategy
+    /// @dev Only callable by ALLOCATOR role. Must validate strategy exists
+    /// @param strategy The address of the strategy to modify
+    /// @param newCap The new maximum amount of assets this strategy can hold
     function changeStrategyCap(address strategy, uint256 newCap) external onlyRole(ALLOCATOR) {
         s_strategy.validateCapChange(strategy, newCap);
 
-        //! TODO: This needs to be timelocked
         s_strategy.changeCap(strategy, newCap);
 
-        // s_strategy.reallocateFunds(i_asset);
-
-        emit SimpleVTS__CapUpdated(strategy, newCap);
+        emit Events.SimpleVTS__CapUpdated(strategy, newCap);
     }
 
+    /// @notice Reallocates funds across strategies according to specified allocations
+    /// @dev Only callable by ALLOCATOR role. Validates total allocations and asset availability
+    /// @param allocations Array of allocation instructions specifying strategy and amount changes
     function reallocateFunds(DataTypes.Allocation[] calldata allocations) external onlyRole(ALLOCATOR) {
         s_strategy.validateReallocateFunds(totalAssets(), i_asset);
 
         s_strategy.reallocateFunds(allocations);
 
-        emit SimpleVTS__FundsReallocated();
+        emit Events.SimpleVTS__FundsReallocated();
     }
 
+    /// @notice Emergency function to withdraw all funds from all strategies back to the vault
+    /// @dev Only callable by MANAGER role. Used in emergency situations to secure assets
     function emergencyWithdrawFunds() external onlyRole(MANAGER) {
         s_strategy.emergencyWithdraw();
 
-        emit SimpleVTS__EmergencyWithdrawFunds();
+        emit Events.SimpleVTS__EmergencyWithdrawFunds();
+    }
+
+    /// @notice Updates the order in which strategies receive deposits
+    /// @dev Only callable by ALLOCATOR role. Queue determines priority for fund deployment
+    /// @param newSupplyQueue Array of strategy indices in desired supply order
+    function updateSupplyQueue(uint256[] memory newSupplyQueue) external onlyRole(ALLOCATOR) {
+        s_strategy.validateNewSupplyQueue(newSupplyQueue, MAX_STRATEGIES);
+
+        s_strategy.updateSupplyQueue(newSupplyQueue);
+
+        emit Events.SimpleVTS__SupplyQueueUpdated(newSupplyQueue);
+    }
+
+    /// @notice Updates the order in which strategies are drained for withdrawals
+    /// @dev Only callable by ALLOCATOR role. Queue determines priority for fund withdrawal
+    /// @param newWithdrawQueue Array of strategy indices in desired withdrawal order
+    function updateWithdrawQueue(uint256[] memory newWithdrawQueue) external onlyRole(ALLOCATOR) {
+        s_strategy.validateNewWithdrawQueue(newWithdrawQueue);
+
+        s_strategy.updateWithdrawQueue(newWithdrawQueue);
+
+        emit Events.SimpleVTS__WithdrawQueueUpdated(newWithdrawQueue);
     }
 
     /*
@@ -242,6 +266,9 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         return s_vault.entryFee;
     }
 
+    /// @notice Returns the internal index of a strategy in the strategies array
+    /// @param strategy The address of the strategy to look up
+    /// @return index The index of the strategy in the strategies array
     function getStrategyIndex(address strategy) external view returns (uint256 index) {
         return s_strategy.getStrategyIndex(strategy);
     }
@@ -252,18 +279,28 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         return s_vault.exitFee;
     }
 
+    /// @notice Returns the current fee recipient address
+    /// @return The address that receives collected entry and exit fees
     function getFeeRecipient() external view returns (address) {
         return s_vault.feeRecipient;
     }
 
+    /// @notice Returns detailed information about a strategy
+    /// @param strategyIndex The index of the strategy in the strategies array
+    /// @return strategy The strategy struct containing address and allocation cap
     function getStrategyDetails(uint256 strategyIndex) external view returns (DataTypes.Strategy memory strategy) {
         strategy = s_strategy.strategies[strategyIndex];
     }
 
+    /// @notice Returns the total number of strategies added to the vault
+    /// @return The count of strategies currently managed by the vault
     function getTotalStrategies() external view returns (uint256) {
         return s_strategy.totalStrategies;
     }
 
+    /// @notice Returns the amount of assets currently deployed in a specific strategy
+    /// @param strategy The address of the strategy to query
+    /// @return assets The amount of underlying assets held by the specified strategy
     function getAssetInStrategy(address strategy) external view returns (uint256 assets) {
         assets = TokenizedStrategyLogic.getAssetBalanceInStrategy(
             s_strategy.strategies[s_strategy.getStrategyIndex(strategy)].strategy
@@ -328,14 +365,20 @@ contract SimpleVTS is SimpleVTS__Storage, ERC4626, AccessControl, ReentrancyGuar
         return ERC20(i_asset).decimals();
     }
 
-    /// @dev Calculates the fees that should be added to an amount `assets` that does not already include fees.
-    /// Used in {ERC4626-mint} and {ERC4626-withdraw} operations.
+    /// @notice Calculates the fees that should be added to an amount that does not already include fees
+    /// @dev Used in {ERC4626-mint} and {ERC4626-withdraw} operations
+    /// @param assets The base amount of assets (without fees)
+    /// @param feeBasisPoints The fee rate in basis points
+    /// @return The calculated fee amount
     function _feeOnRaw(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
         return assets.mulDivUp(feeBasisPoints, BASIS_POINT_SCALE);
     }
 
-    /// @dev Calculates the fee part of an amount `assets` that already includes fees.
-    /// Used in {ERC4626-deposit} and {ERC4626-redeem} operations.
+    /// @notice Calculates the fee portion of an amount that already includes fees
+    /// @dev Used in {ERC4626-deposit} and {ERC4626-redeem} operations
+    /// @param assets The total amount of assets (including fees)
+    /// @param feeBasisPoints The fee rate in basis points
+    /// @return The calculated fee amount
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) internal pure returns (uint256) {
         return assets.mulDivUp(feeBasisPoints, feeBasisPoints + BASIS_POINT_SCALE);
     }

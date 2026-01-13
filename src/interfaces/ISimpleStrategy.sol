@@ -26,5 +26,8 @@ interface ISimpleStrategy {
     /// @return balance The total amount of assets managed by this strategy
     function totalAssets() external view returns (uint256 balance);
 
+    /// @notice Returns the total balance deployed across external protocols
+    /// @dev Excludes any balance held directly by the strategy contract
+    /// @return balance The total amount of assets deployed in external markets
     function getTotalBalanceInMarkets() external view returns (uint256 balance);
 }

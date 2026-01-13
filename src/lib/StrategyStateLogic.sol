@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TokenizedStrategyLogic} from "./TokenizedStrategyLogic.sol";
+
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./Errors.sol";
 
-/**
- * @title State Logic
- * @author @megabyte0x.eth
- * @notice This library is used to update the internal `s_strategy` variable of the contract.
- */
+/// @title StrategyStateLogic
+/// @notice Library for managing strategy state operations including addition, removal, and queue management
+/// @dev Handles all strategy state transitions and maintains data consistency
+/// @author megabyte0x.eth
 library StrategyStateLogic {
-    /**
-     * @notice Returns the `index` of `strategy`.
-     * @param s Current `State`
-     * @param strategy Strategy address to find `index` for
-     */
+    using TokenizedStrategyLogic for address;
+
+    /// @notice Retrieves the index of a strategy in the strategies array
+    /// @dev Reverts if strategy is not found. Returns actual index (subtracts 1 from stored value)
+    /// @param s The strategy state storage reference
+    /// @param strategy The address of the strategy to look up
+    /// @return index The zero-based index of the strategy
     function getStrategyIndex(DataTypes.StrategyState storage s, address strategy)
         internal
         view
@@ -25,46 +28,80 @@ library StrategyStateLogic {
         index = ip1 - 1;
     }
 
-    /**
-     * @notice This adds the strategy in the `strategies` mapping, increase the `totalStrategies` by 1 and adds the updated `totalStrategy` as index in `strategyToIndex` for `newStrategy`.
-     * @param s Current `State`
-     * @param newStrategy New strategy address
-     * @param cap New strategy cap
-     */
+    /// @notice Adds a new strategy to the vault with the specified allocation cap
+    /// @dev Adds strategy to both supply and withdraw queues, increments total strategies count
+    /// @param s The strategy state storage reference
+    /// @param newStrategy The address of the strategy to add
+    /// @param cap The maximum allocation cap for the strategy
     function addStrategy(DataTypes.StrategyState storage s, address newStrategy, uint256 cap) internal {
         s.strategies[s.totalStrategies] = DataTypes.Strategy({strategy: newStrategy, cap: cap});
-        /// @dev Index + 1, this will prevent any addition to 0 index.
+
+        s.supplyQueue.push(s.totalStrategies);
+        s.withdrawQueue.push(s.totalStrategies);
+
+        // Store index + 1 to differentiate between unset (0) and first strategy (1)
         s.strategyToIndex[newStrategy] = ++s.totalStrategies;
-        //! TODO: Manage supply queue
     }
 
-    /**
-     * This removes the `strategy` from the `strategies` mapping, decrease the `totalStrategies` by 1 and updates the `strategyToIndex` to 0.
-     * @param s Current `State`
-     * @param strategy Strategy address to remove
-     */
-    function removeStrategy(DataTypes.StrategyState storage s, address strategy) internal {
-        uint256 idx = getStrategyIndex(s, strategy);
-        uint256 lastIdx = --s.totalStrategies;
-
-        /// @dev if the strategy is not at the last index in the mapping, replace the last strtegy with the removing `strategy`.
-        if (idx != lastIdx) {
-            DataTypes.Strategy memory moved = s.strategies[lastIdx];
-            s.strategies[idx] = moved;
-            s.strategyToIndex[moved.strategy] = idx + 1;
-        }
-        /// @dev Delete the last strategy.
-        delete s.strategies[lastIdx];
-        delete s.strategyToIndex[strategy];
-    }
-
-    /**
-     * This changes the cap of `strategy` and updates the `strategies` mapping with the `newCap`.
-     * @param s Current `State`
-     * @param strategy Strategy address whose cap needs to change.
-     * @param newCap The new cap for the `strategy`.
-     */
+    /// @notice Updates the allocation cap for an existing strategy
+    /// @dev Uses getStrategyIndex to locate the strategy and update its cap
+    /// @param s The strategy state storage reference
+    /// @param strategy The address of the strategy to modify
+    /// @param newCap The new allocation cap for the strategy
     function changeCap(DataTypes.StrategyState storage s, address strategy, uint256 newCap) internal {
         s.strategies[getStrategyIndex(s, strategy)].cap = newCap;
+    }
+
+    /// @notice Updates the supply queue order for strategy allocation priority
+    /// @dev Directly replaces the current supply queue with the new one
+    /// @param s The strategy state storage reference
+    /// @param newQueue Array of strategy indices in desired supply order
+    function updateSupplyQueue(DataTypes.StrategyState storage s, uint256[] memory newQueue) internal {
+        s.supplyQueue = newQueue;
+    }
+
+    /// @notice Updates the withdraw queue and removes strategies not included in the new queue
+    /// @dev Validates that removed strategies have zero cap and balance before deletion
+    /// @param s The strategy state storage reference
+    /// @param newQueue Array of indices referencing positions in current withdraw queue
+    function updateWithdrawQueue(DataTypes.StrategyState storage s, uint256[] memory newQueue) internal {
+        uint256[] memory currentWithdrawQueue = s.withdrawQueue;
+        uint256 newLength = newQueue.length;
+        uint256 currLength = currentWithdrawQueue.length;
+
+        // Track which strategies from current queue are included in new queue
+        bool[] memory seen = new bool[](currLength);
+        uint256[] memory newWithdrawQueue = new uint256[](newLength);
+
+        // Build new queue and mark included strategies
+        for (uint256 i; i < newLength; ++i) {
+            uint256 prevIndex = newQueue[i];
+
+            // Get strategy ID from current queue at the specified index
+            uint256 id = currentWithdrawQueue[prevIndex];
+            if (seen[prevIndex]) revert Errors.DuplicateStrategy(id);
+            seen[prevIndex] = true;
+
+            newWithdrawQueue[i] = id;
+        }
+
+        // Remove strategies not included in the new queue
+        for (uint256 i; i < currLength; ++i) {
+            if (!seen[i]) {
+                uint256 id = currentWithdrawQueue[i];
+                DataTypes.Strategy memory strategy = s.strategies[id];
+
+                // Validate strategy can be safely removed
+                if (strategy.cap != 0) revert Errors.InvalidStrategyRemovalWithNonZeroCap(id);
+
+                if (strategy.strategy.getAssetBalanceInStrategy() != 0) {
+                    revert Errors.InvalidStrategyRemovalWithNonZeroAssetBalance(id);
+                }
+
+                delete s.strategies[id];
+            }
+        }
+
+        s.withdrawQueue = newWithdrawQueue;
     }
 }
